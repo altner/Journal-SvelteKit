@@ -26,6 +26,11 @@
 				photos: { id: string; filename: string; postId: string }[];
 			} | null;
 			tags: { id: string; name: string; slug: string }[];
+			latitude: number | null;
+			longitude: number | null;
+			locationPlace: string | null;
+			locationCountry: string | null;
+			locationName: string | null;
 		};
 		user: App.Locals['user'];
 		editing?: boolean;
@@ -43,6 +48,15 @@
 			minute: '2-digit'
 		});
 	}
+
+	function formatLocation(p: {
+		locationName: string | null;
+		locationPlace: string | null;
+		locationCountry: string | null;
+	}) {
+		const placeAndCountry = [p.locationPlace, p.locationCountry].filter(Boolean).join(', ');
+		return [p.locationName, placeAndCountry].filter(Boolean).join(' · ');
+	}
 </script>
 
 <article class="card post" id={post.anchorId ?? undefined}>
@@ -58,6 +72,16 @@
 					<a href="/albums/{post.album.id}">📁 {post.album.title}</a>
 				{/if}
 			</div>
+			{#if post.latitude != null && post.longitude != null}
+				<div class="post-location">
+					<a
+						class="location-pill"
+						href={`https://www.openstreetmap.org/?mlat=${post.latitude}&mlon=${post.longitude}#map=16/${post.latitude}/${post.longitude}`}
+						target="_blank"
+						rel="noopener noreferrer">📍 {formatLocation(post)}</a
+					>
+				</div>
+			{/if}
 			{#if post.tags.length > 0}
 				<div class="post-tags">
 					{#each post.tags as t (t.id)}
@@ -82,6 +106,15 @@
 			title={post.title}
 			text={post.text}
 			tags={post.tags.map((t) => t.name)}
+			location={post.latitude != null && post.longitude != null
+				? {
+						latitude: post.latitude,
+						longitude: post.longitude,
+						locationPlace: post.locationPlace,
+						locationCountry: post.locationCountry,
+						locationName: post.locationName
+					}
+				: null}
 			onSaved={() => onEditDone?.()}
 			onCancel={() => onEditDone?.()}
 		/>
@@ -141,6 +174,17 @@
 		font-size: 15px;
 		line-height: 1.35;
 		white-space: pre-wrap;
+	}
+	.post-location {
+		margin-top: 4px;
+	}
+	.location-pill {
+		color: var(--fb-gray);
+		font-size: 12px;
+	}
+	.location-pill:hover {
+		color: var(--fb-blue);
+		text-decoration: underline;
 	}
 	.post-tags {
 		display: flex;

@@ -58,6 +58,16 @@ export const actions: Actions = {
 		);
 		const rawTags = parseTagsField(data.get('tags'));
 
+		const latitudeRaw = Number(data.get('latitude'));
+		const longitudeRaw = Number(data.get('longitude'));
+		const hasLocation =
+			Number.isFinite(latitudeRaw) &&
+			Number.isFinite(longitudeRaw) &&
+			String(data.get('latitude') ?? '').trim() !== '';
+		const locationPlace = String(data.get('locationPlace') ?? '').trim();
+		const locationCountry = String(data.get('locationCountry') ?? '').trim();
+		const locationName = String(data.get('locationName') ?? '').trim();
+
 		const files = data
 			.getAll('photos')
 			.filter((f): f is File => f instanceof File && f.size > 0);
@@ -78,7 +88,12 @@ export const actions: Actions = {
 				title: title || null,
 				text: text || null,
 				authorId: user.id,
-				createdAt
+				createdAt,
+				latitude: hasLocation ? latitudeRaw : null,
+				longitude: hasLocation ? longitudeRaw : null,
+				locationPlace: locationPlace || null,
+				locationCountry: locationCountry || null,
+				locationName: locationName || null
 			})
 			.returning();
 

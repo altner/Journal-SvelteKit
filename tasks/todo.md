@@ -1,5 +1,97 @@
 # Todo
 
+## Offen: Text-Formatierung im Post-Composer
+
+- [ ] Aktuell nur reiner Text (`post.text` als Plain-Text, `white-space: pre-wrap` in `PostCard`).
+      Standard-Formatierung für Postings ergänzen: Überschriften, Listen (geordnet/ungeordnet),
+      Zitat/Blockquote, vermutlich auch Fett/Kursiv/Links — üblicher Funktionsumfang eines
+      Rich-Text-Editors für Beiträge
+- [ ] Noch zu klären: Speicherformat (Markdown vs. HTML vs. strukturiertes JSON), welcher
+      Editor/welche Lib im Composer (z.B. ProseMirror/Tiptap vs. simples Markdown-Textarea +
+      Vorschau), ob bestehende Posts mit reinem Plain-Text weiterhin unverändert korrekt angezeigt
+      werden müssen (Migrationsfrage)
+- [ ] Zusätzlich: Text soll auch zwischen einzelnen Foto-Abschnitten eingefügt werden können, nicht
+      nur als ein Textblock vor allen Fotos — d.h. Text und Foto-Gruppen innerhalb eines Posts
+      frei abwechselbar/verschachtelbar. Größere strukturelle Änderung als reine Formatierung:
+      betrifft Speichermodell von `post`/`photo` (aktuell ein Textfeld + flache Foto-Liste pro
+      Post), Composer-UI (Reihenfolge von Text- und Foto-Blöcken muss editierbar sein) und
+      Rendering in `PostCard`/`PhotoGrid`
+
+## GPS-Standort-Feature — erledigt
+
+- [x] Neue nullable Spalten auf `post` (`latitude`, `longitude`, `location_place`,
+      `location_country`, `location_name`) — bewusst alle ohne `NOT NULL`/Default, um das bekannte
+      `db:push`-Risiko (destruktiver Vorschlag bei NOT-NULL-Spalten, siehe `isStatusPost`-Vorfall)
+      von vornherein zu vermeiden
+- [x] `leaflet` + `@types/leaflet` installiert
+- [x] Neuer Endpunkt `src/routes/api/reverse-geocode/+server.ts` — erster serverseitiger
+      Outbound-Fetch des Projekts, Proxy zu Nominatim, auth-gated (gleiche Begründung wie
+      addPhotos/delete/edit: verhindert, dass Besucher über diesen Server Nominatims
+      Rate-Limit strapazieren)
+- [x] `src/lib/components/LocationPicker.svelte` neu: Leaflet-Karte (SSR-sicher per dynamischem
+      `import('leaflet')` in `onMount`, CSS-Import auf Modul-Ebene unproblematisch), Klick setzt
+      draggable Marker, "Meinen Standort verwenden"-Button (Browser-Geolocation), debounced
+      Reverse-Geocoding, Ort/Land/POI-Name frei editierbar, `reset()`-Methode nach demselben
+      `bind:this`-Muster wie `TagInput`
+      Sitzung bestätigt: exportierte Funktionen sind unabhängig von Runes/Legacy-Modus über
+      `bind:this` erreichbar)
+- [x] `PostComposer`/`EditPostForm` um `LocationPicker` erweitert, `PostCard` zeigt Standort als
+      reine Text-Pill (📍 POI · Ort, Land) mit Link zu openstreetmap.org — **keine** eingebettete
+      Karte für Leser, nur der Betreiber lädt beim Erstellen/Bearbeiten Kartenkacheln
+- [x] Datenschutzerklärung angepasst: §7 präzisiert (Karten werden nur im Browser des Betreibers
+      geladen, nie bei Lesern), §8 neuer Unterabsatz zur Nominatim-Weitergabe (nur serverseitig,
+      nur bei aktivem Setzen/Ändern eines Standorts durch den Betreiber)
+- [x] `npm run check` — 0 Fehler/Warnungen (`state_referenced_locally`-Warnung in
+      `LocationPicker.svelte` erwartungsgemäß per `untrack()` aufgelöst, gleiches Muster wie
+      `TagInput`/`PostTimeline`)
+- [x] Im Browser mit temporärem QA-User (danach gelöscht) end-to-end getestet: Karte rendert ohne
+      SSR-/Hydration-Fehler, Klick auf Karte setzt Marker, Reverse-Geocoding liefert innerhalb ~1s
+      korrekten Ort/Land/POI-Namen (getestet mit einem Punkt im Riesengebirge → "Rokytnice nad
+      Jizerou", "Česko", POI "Kládová cesta"), POI manuell angepasst, Post erstellt → Feed zeigt
+      korrekte Pill + korrekten openstreetmap.org-Link, DB-Werte korrekt persistiert; Bearbeiten
+      bestehender Post → Picker vorbefüllt mit vorhandenem Standort (Karte bereits expandiert,
+      alle Felder korrekt); Standort über "Standort entfernen" im Edit-Formular gelöscht,
+      gespeichert → alle fünf Spalten korrekt auf NULL zurückgesetzt, Pill verschwindet
+- [x] Re-Geocoding beim Marker-Ziehen (`dragend`) nicht separat end-to-end getestet (Leaflet-
+      Karteninstanz nicht von außen ansprechbar für Automatisierung) — nutzt aber exakt denselben
+      Code-Pfad (`scheduleGeocode`/`runGeocode`) wie das bereits verifizierte Klick-Verhalten
+- [x] "Meinen Standort verwenden" (Browser-Geolocation) nicht interaktiv getestet — passt zur
+      bereits dokumentierten Einschränkung des Vorschau-Browser-Tools bei Berechtigungsdialogen
+- [x] **Wichtiger Hinweis, nicht durch dieses Feature verursacht:** Bei der Verifikation aufgefallen,
+      dass ein zweiter ursprünglicher Post (`ef9d947e...`, "Neue Fotos zum Album Volleyball wurden
+      hinzugefügt", 19.07.2026 13:48, mit einem Foto) nicht mehr in der lokalen Dev-DB vorhanden
+      ist. Geprüft und ausgeschlossen, dass meine Änderungen das verursacht haben (meine
+      Edit-Aktion wirkt ausschließlich auf die konkret bearbeitete Post-ID, hier ein separater
+      Test-Post) — Foto-Tabelle und `uploads/`-Ordner sind konsistent (kein verwaistes File),
+      spricht für eine bereits zuvor sauber über die App gelöschte Zeile statt Datenkorruption.
+      Da ich zu Sitzungsbeginn keinen Baseline-Check gemacht habe, kann ich nicht zweifelsfrei
+      sagen, wann das passiert ist — falls das unerwartet war, bitte Bescheid geben
+- [x] Deployed auf achis.blog (Build, Sync, `npm ci --omit=dev`, `drizzle-kit push` → "No changes
+      detected" da Schema bereits synchron, Service-Neustart — alles über `scripts/deploy.sh`)
+
+## `scripts/deploy.sh` — `db:push` ins Deploy integriert (erledigt)
+
+- [x] Auf Wunsch: `npm run db:push` nicht mehr als separater manueller Schritt, sondern in
+      `scripts/deploy.sh` integriert, TTY-gated (`[ -t 0 ]`) — `drizzle-kit push` braucht ein
+      echtes Terminal für seinen (bei `strict:true` immer erscheinenden) Bestätigungsprompt, der
+      nie blind auto-bestätigt werden darf (siehe `isStatusPost`-Vorfall). Läuft der Nutzer das
+      Skript selbst interaktiv, wird der Schritt per `ssh -t` mit echtem Remote-Pseudo-Terminal
+      ausgeführt; läuft es nicht-interaktiv (z.B. Agent-Shell), wird er übersprungen und
+      stattdessen der manuelle Fallback-Hinweis ausgegeben
+- [x] Zwei live gefundene und behobene Probleme dabei:
+      1. `npx drizzle-kit push` allein reicht nicht — `drizzle.config.ts` macht selbst
+         `require('drizzle-kit')`, aufgelöst gegen `node_modules` des Projekts; `npx`s
+         On-Demand-Fetch in den npx-Cache erfüllt das nicht (`Cannot find module 'drizzle-kit'`).
+         Fix: `npm install` (volle Deps inkl. `drizzle-kit` als devDependency) vor dem Push-Aufruf,
+         zusätzlich zum bestehenden `npm ci --omit=dev` für die Laufzeit-Deps.
+      2. `DATABASE_URL is not set` — die remote systemd-Unit setzt Env-Vars direkt über
+         `Environment=`-Zeilen in der Unit-Datei (kein `.env`), eine reine `ssh`-Shell sieht davon
+         nichts. Fix: `DATABASE_URL` wird für den Push-Aufruf explizit gesetzt, Wert als
+         `REMOTE_DATABASE_URL="file:$REMOTE_DIR/data/local.db"` oben im Skript neben den anderen
+         Konstanten gepflegt (muss manuell synchron gehalten werden mit der `Environment=
+         DATABASE_URL=...`-Zeile der systemd-Unit, falls sich der DB-Pfad je ändert)
+- [x] End-to-end mit echtem Deploy verifiziert (siehe GPS-Feature-Deploy oben)
+
 ## Tags-Feature — erledigt
 
 - [x] Diskussion vorab: Tags statt starrer Kategorien (Kategorien würden mit dem bestehenden

@@ -2,10 +2,12 @@
 	import { enhance } from '$app/forms';
 	import { tick } from 'svelte';
 	import TagInput from './TagInput.svelte';
+	import LocationPicker from './LocationPicker.svelte';
 
 	let fileCount = $state(0);
 	let error = $state<string | undefined>();
 	let tagInputRef: ReturnType<typeof TagInput> | undefined = $state();
+	let locationPickerRef: ReturnType<typeof LocationPicker> | undefined = $state();
 
 	function todayLocalDate() {
 		const d = new Date();
@@ -42,6 +44,7 @@
 				formElement.reset();
 				fileCount = 0;
 				tagInputRef?.reset();
+				locationPickerRef?.reset();
 				// formElement.reset() clears the date/time inputs' DOM values directly without
 				// Svelte noticing, so re-assigning right away can lose to that reset in the same
 				// tick — wait a tick first so our values win.
@@ -83,6 +86,8 @@
 		Tags
 		<TagInput name="tags" bind:this={tagInputRef} />
 	</label>
+
+	<LocationPicker bind:this={locationPickerRef} />
 
 	<label>
 		Fotos (optional, mehrere möglich)

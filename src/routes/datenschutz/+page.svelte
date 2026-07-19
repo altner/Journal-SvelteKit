@@ -119,9 +119,14 @@
 			Über das in Abschnitt 5 beschriebene Login-Cookie hinaus setzt diese Website
 			<strong>keine weiteren Cookies</strong> und verwendet keine Tracking- oder
 			Analyse-Tools (z.B. Google Analytics, Matomo, Plausible). Es findet kein
-			websiteübergreifendes Tracking und keine Profilbildung statt. Es werden auch keine
-			Inhalte von Drittanbietern (z.B. Karten, Videos, Schriftarten) von externen Servern
-			nachgeladen.
+			websiteübergreifendes Tracking und keine Profilbildung statt. Für Besucherinnen und
+			Besucher, die diese Website nur lesen, werden keine Inhalte von Drittanbietern (z.B.
+			Karten, Videos, Schriftarten) von externen Servern nachgeladen. Beim Erstellen oder
+			Bearbeiten eines Beitrags kann der Betreiber optional einen Standort auf einer
+			interaktiven Kartenansicht (OpenStreetMap) auswählen; die dafür benötigten
+			Kartenkacheln werden in diesem Fall ausschließlich im Browser des Betreibers von
+			Servern der OpenStreetMap Foundation geladen — nie im Browser von Leserinnen und
+			Lesern. Näheres dazu in Abschnitt 8.
 		</p>
 
 		<hr />
@@ -130,7 +135,27 @@
 		<p>
 			Eine Weitergabe deiner Daten an Dritte findet nicht statt, mit Ausnahme des in Abschnitt
 			4 genannten Hosting-Anbieters, der im Rahmen einer Auftragsverarbeitung (Art. 28 DSGVO)
-			technisch notwendige Verbindungsdaten verarbeitet.
+			technisch notwendige Verbindungsdaten verarbeitet, sowie des im Folgenden beschriebenen
+			Falls.
+		</p>
+		<p><strong>OpenStreetMap / Nominatim (Standort-Funktion)</strong></p>
+		<p>
+			Wenn der Betreiber beim Erstellen oder Bearbeiten eines Beitrags einen Standort auf der
+			Karte auswählt, sendet der Server dieser Website die gewählten Koordinaten einmalig an
+			den Reverse-Geocoding-Dienst <strong>Nominatim</strong> der OpenStreetMap Foundation, um
+			daraus einen Orts- und Ländernamen zu ermitteln. Diese Abfrage erfolgt ausschließlich
+			serverseitig und ausschließlich beim aktiven Anlegen oder Ändern eines Standorts durch
+			den Betreiber — nicht automatisch und nicht beim Lesen eines Beitrags durch
+			Besucherinnen und Besucher. Die ermittelten Orts-, Land- und optionalen
+			Ortsnamen-Angaben werden dauerhaft beim jeweiligen Beitrag gespeichert und öffentlich
+			als reiner Text angezeigt (z.B. „📍 Dresden, Deutschland"); es wird zu keinem
+			Zeitpunkt eine interaktive Karte an Besucherinnen und Besucher ausgeliefert. Details zur
+			Datenverarbeitung durch die OpenStreetMap Foundation:
+			<a
+				href="https://osmfoundation.org/wiki/Privacy_Policy"
+				target="_blank"
+				rel="noopener noreferrer">osmfoundation.org/wiki/Privacy_Policy</a
+			>.
 		</p>
 
 		<hr />

@@ -58,13 +58,31 @@ export const actions: Actions = {
 		const text = String(data.get('text') ?? '').trim();
 		const rawTags = parseTagsField(data.get('tags'));
 
+		const latitudeRaw = Number(data.get('latitude'));
+		const longitudeRaw = Number(data.get('longitude'));
+		const hasLocation =
+			Number.isFinite(latitudeRaw) &&
+			Number.isFinite(longitudeRaw) &&
+			String(data.get('latitude') ?? '').trim() !== '';
+		const locationPlace = String(data.get('locationPlace') ?? '').trim();
+		const locationCountry = String(data.get('locationCountry') ?? '').trim();
+		const locationName = String(data.get('locationName') ?? '').trim();
+
 		if (!text && found.photos.length === 0) {
 			return fail(400, { error: 'Bitte gib einen Text ein.' });
 		}
 
 		await db
 			.update(post)
-			.set({ title: title || null, text: text || null })
+			.set({
+				title: title || null,
+				text: text || null,
+				latitude: hasLocation ? latitudeRaw : null,
+				longitude: hasLocation ? longitudeRaw : null,
+				locationPlace: locationPlace || null,
+				locationCountry: locationCountry || null,
+				locationName: locationName || null
+			})
 			.where(eq(post.id, found.id));
 
 		await setPostTags(found.id, rawTags);

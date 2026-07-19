@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, unique } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, unique } from 'drizzle-orm/sqlite-core';
 import { relations } from 'drizzle-orm';
 
 // ---------- Auth ----------
@@ -48,6 +48,15 @@ export const post = sqliteTable('post', {
 	// true only for auto-generated "photos added" posts (albums/[id] addPhotos action) —
 	// those stay deletable but not editable.
 	isStatusPost: integer('is_status_post', { mode: 'boolean' }).notNull().default(false),
+	// GPS location, all nullable — a post can exist without one. Nullable, no default, so
+	// `db:push` can only ever emit a lossless ADD COLUMN for these (see CLAUDE.md: adding
+	// isStatusPost, a NOT NULL column even WITH a default, once made drizzle-kit propose
+	// wiping the table — nullable columns have no such ambiguity).
+	latitude: real('latitude'),
+	longitude: real('longitude'),
+	locationPlace: text('location_place'), // e.g. "Dresden" — resolved once via Nominatim at write time
+	locationCountry: text('location_country'), // e.g. "Deutschland"
+	locationName: text('location_name'), // optional POI label, e.g. "Elbwiesen" — user-editable
 	createdAt: integer('created_at', { mode: 'timestamp' })
 		.notNull()
 		.$defaultFn(() => new Date())

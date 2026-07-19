@@ -1,12 +1,14 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import TagInput from './TagInput.svelte';
+	import LocationPicker from './LocationPicker.svelte';
 
 	let {
 		postId,
 		title,
 		text,
 		tags = [],
+		location = null,
 		onSaved,
 		onCancel
 	}: {
@@ -14,6 +16,13 @@
 		title: string | null;
 		text: string | null;
 		tags?: string[];
+		location?: {
+			latitude: number;
+			longitude: number;
+			locationPlace: string | null;
+			locationCountry: string | null;
+			locationName: string | null;
+		} | null;
 		onSaved?: () => void;
 		onCancel?: () => void;
 	} = $props();
@@ -53,6 +62,8 @@
 		Tags
 		<TagInput name="tags" initialTags={tags} />
 	</label>
+
+	<LocationPicker initialLocation={location} />
 
 	<div class="actions">
 		<button type="submit">Speichern</button>
