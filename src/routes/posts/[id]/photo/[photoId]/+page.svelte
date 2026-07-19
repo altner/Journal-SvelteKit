@@ -1,0 +1,35 @@
+<script lang="ts">
+	import { goto } from '$app/navigation';
+	import type { PageServerData } from './$types';
+	import PhotoLightbox from '$lib/components/PhotoLightbox.svelte';
+
+	let { data }: { data: PageServerData } = $props();
+
+	const photos = $derived(data.post.photos);
+	const photo = $derived(photos[data.index]);
+
+	function hrefFor(i: number) {
+		return `/posts/${data.post.id}/photo/${photos[i].id}`;
+	}
+
+	function onKeydown(e: KeyboardEvent) {
+		if (e.key === 'Escape') goto(`/posts/${data.post.id}`);
+		else if (e.key === 'ArrowRight' && photos.length > 1)
+			goto(hrefFor((data.index + 1) % photos.length));
+		else if (e.key === 'ArrowLeft' && photos.length > 1)
+			goto(hrefFor((data.index - 1 + photos.length) % photos.length));
+	}
+</script>
+
+<svelte:window onkeydown={onKeydown} />
+
+<svelte:head>
+	<title>{data.post.title || 'Foto'} · achis.blog</title>
+</svelte:head>
+
+<PhotoLightbox
+	{photo}
+	closeHref="/posts/{data.post.id}"
+	prevHref={photos.length > 1 ? hrefFor((data.index - 1 + photos.length) % photos.length) : undefined}
+	nextHref={photos.length > 1 ? hrefFor((data.index + 1) % photos.length) : undefined}
+/>
