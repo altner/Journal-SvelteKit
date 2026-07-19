@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import type { PageServerData } from './$types';
+	import type { PageData } from './$types';
 	import PhotoLightbox from '$lib/components/PhotoLightbox.svelte';
 
-	let { data }: { data: PageServerData } = $props();
+	let { data }: { data: PageData } = $props();
 
 	const photos = $derived(data.album.photos);
 	const photo = $derived(photos[data.index]);
@@ -32,4 +32,6 @@
 	closeHref="/albums/{data.album.id}"
 	prevHref={photos.length > 1 ? hrefFor((data.index - 1 + photos.length) % photos.length) : undefined}
 	nextHref={photos.length > 1 ? hrefFor((data.index + 1) % photos.length) : undefined}
+	deleteAction={data.user ? `/albums/${data.album.id}?/deletePhoto` : undefined}
+	onDeleted={() => goto(`/albums/${data.album.id}`)}
 />

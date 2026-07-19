@@ -28,6 +28,18 @@ a {
 	margin: 0 auto;
 	padding: 24px 16px 48px 16px;
 }
+@media (min-width: 768px) {
+	.page {
+		max-width: 640px;
+	}
+}
+@media (min-width: 1024px) {
+	.page {
+		max-width: 100%;
+		margin: 0;
+		padding: 24px 0 48px 0;
+	}
+}
 
 .card {
 	background: #fff;

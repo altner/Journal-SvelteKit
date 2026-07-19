@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { SOCIAL_PROFILES } from '$lib/consts';
+
+	let { desktopRail = true }: { desktopRail?: boolean } = $props();
 </script>
 
-<footer>
+<footer class:hidden-desktop={!desktopRail}>
 	<div class="footer-inner">
 		<nav class="social-links" aria-label="Social Media">
 			{#each SOCIAL_PROFILES as profile (profile.platform)}
@@ -30,6 +32,25 @@
 		gap: 10px;
 		font-size: 12px;
 		color: var(--fb-gray);
+	}
+	@media (min-width: 768px) {
+		.footer-inner {
+			max-width: 640px;
+		}
+	}
+	@media (min-width: 1024px) {
+		footer {
+			border-top: none;
+			margin-top: 0;
+		}
+		footer.hidden-desktop {
+			display: none;
+		}
+		.footer-inner {
+			max-width: none;
+			margin: 0;
+			padding: 0;
+		}
 	}
 	.social-links,
 	.legal-links {

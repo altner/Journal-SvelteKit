@@ -2,8 +2,9 @@ import { error, fail } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 import { db } from '$lib/server/db';
 import { eq } from 'drizzle-orm';
-import { post, photo, album } from '$lib/server/db/schema';
-import { deleteUploadedPhoto } from '$lib/server/storage';
+import { post } from '$lib/server/db/schema';
+import { deletePostCascade } from '$lib/server/posts';
+import { setPostTags, parseTagsField } from '$lib/server/tags';
 
 export const load: PageServerLoad = async ({ params }) => {
 	const found = await db.query.post.findFirst({
@@ -14,13 +15,14 @@ export const load: PageServerLoad = async ({ params }) => {
 				with: {
 					photos: { orderBy: (photo, { asc }) => asc(photo.position) }
 				}
-			}
+			},
+			tags: { with: { tag: true } }
 		}
 	});
 
 	if (!found) throw error(404, 'Post nicht gefunden');
 
-	return { post: found };
+	return { post: { ...found, tags: found.tags.map((pt) => pt.tag) } };
 };
 
 export const actions: Actions = {
@@ -34,19 +36,7 @@ export const actions: Actions = {
 		});
 		if (!found) throw error(404, 'Post nicht gefunden');
 
-		// Album selbst bleibt bestehen — nur den Rückverweis lösen, falls dieser Post ihn begründet hat
-		if (found.album && found.album.originPostId === found.id) {
-			await db.update(album).set({ originPostId: null }).where(eq(album.id, found.album.id));
-		}
-
-		// Dateien von der Platte entfernen (kein FK-Cascade aktiv — SQLite erzwingt Foreign Keys nur
-		// mit PRAGMA foreign_keys=ON, was dieses Projekt nirgends setzt).
-		for (const p of found.photos) {
-			await deleteUploadedPhoto(p.filename);
-		}
-
-		await db.delete(photo).where(eq(photo.postId, found.id));
-		await db.delete(post).where(eq(post.id, found.id));
+		await deletePostCascade(found);
 	},
 
 	edit: async ({ request, params, locals }) => {
@@ -66,6 +56,7 @@ export const actions: Actions = {
 		const data = await request.formData();
 		const title = String(data.get('title') ?? '').trim();
 		const text = String(data.get('text') ?? '').trim();
+		const rawTags = parseTagsField(data.get('tags'));
 
 		if (!text && found.photos.length === 0) {
 			return fail(400, { error: 'Bitte gib einen Text ein.' });
@@ -75,5 +66,7 @@ export const actions: Actions = {
 			.update(post)
 			.set({ title: title || null, text: text || null })
 			.where(eq(post.id, found.id));
+
+		await setPostTags(found.id, rawTags);
 	}
 };

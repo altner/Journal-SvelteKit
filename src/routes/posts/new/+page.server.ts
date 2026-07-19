@@ -3,23 +3,30 @@ import type { Actions, PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
 import { album, photo, post } from '$lib/server/db/schema';
 import { saveUploadedPhoto } from '$lib/server/storage';
+import { setPostTags, parseTagsField } from '$lib/server/tags';
 import { eq } from 'drizzle-orm';
 
-// Nimmt das optionale "date"-Feld (YYYY-MM-DD, z.B. für nachträglich hochgeladene ältere Fotos)
-// und kombiniert es mit der aktuellen Uhrzeit, damit mehrere am selben Tag rückdatierte Posts
-// trotzdem in Einreihenfolge sortiert bleiben. Bei fehlendem/ungültigem Wert: jetzt.
-function resolveCreatedAt(dateInput: string): Date {
-	const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateInput);
-	if (!match) return new Date();
-
+// Nimmt die optionalen "date"/"time"-Felder (YYYY-MM-DD / HH:MM, z.B. für nachträglich
+// hochgeladene ältere Fotos) und kombiniert sie. Ohne gültiges Datum: jetzt. Mit Datum aber ohne
+// gültige Uhrzeit: aktuelle Uhrzeit (Fallback, wie zuvor), damit mehrere am selben Tag
+// rückdatierte Posts trotzdem in Einreihenfolge sortiert bleiben.
+function resolveCreatedAt(dateInput: string, timeInput: string): Date {
+	const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateInput);
 	const now = new Date();
-	const [, year, month, day] = match;
+	if (!dateMatch) return now;
+
+	const timeMatch = /^(\d{2}):(\d{2})$/.exec(timeInput);
+	const [hours, minutes] = timeMatch
+		? [Number(timeMatch[1]), Number(timeMatch[2])]
+		: [now.getHours(), now.getMinutes()];
+
+	const [, year, month, day] = dateMatch;
 	const combined = new Date(
 		Number(year),
 		Number(month) - 1,
 		Number(day),
-		now.getHours(),
-		now.getMinutes(),
+		hours,
+		minutes,
 		now.getSeconds(),
 		now.getMilliseconds()
 	);
@@ -45,7 +52,11 @@ export const actions: Actions = {
 		const text = String(data.get('text') ?? '').trim();
 		const saveAsAlbum = data.get('saveAsAlbum') === 'on';
 		const albumTitle = String(data.get('albumTitle') ?? '').trim();
-		const createdAt = resolveCreatedAt(String(data.get('date') ?? '').trim());
+		const createdAt = resolveCreatedAt(
+			String(data.get('date') ?? '').trim(),
+			String(data.get('time') ?? '').trim()
+		);
+		const rawTags = parseTagsField(data.get('tags'));
 
 		const files = data
 			.getAll('photos')
@@ -70,6 +81,8 @@ export const actions: Actions = {
 				createdAt
 			})
 			.returning();
+
+		await setPostTags(createdPost.id, rawTags);
 
 		let albumId: string | null = null;
 

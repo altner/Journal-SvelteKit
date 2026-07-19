@@ -43,6 +43,11 @@
 		grid-template-columns: repeat(2, 1fr);
 		gap: 12px;
 	}
+	@media (min-width: 768px) {
+		.grid {
+			grid-template-columns: repeat(3, 1fr);
+		}
+	}
 	.tile {
 		overflow: hidden;
 	}

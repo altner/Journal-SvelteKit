@@ -1,25 +1,28 @@
 import { mkdir, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import sharp from 'sharp';
 import { env } from '$env/dynamic/private';
 
 const UPLOAD_DIR = env.UPLOAD_DIR || path.resolve('uploads');
+
+const MAX_WIDTH = 2000;
+const WEBP_QUALITY = 80;
 
 export async function ensureUploadDir() {
 	await mkdir(UPLOAD_DIR, { recursive: true });
 }
 
-function safeExtension(originalName: string): string {
-	const ext = path.extname(originalName).toLowerCase();
-	const allowed = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.avif'];
-	return allowed.includes(ext) ? ext : '';
-}
-
-/** Saves an uploaded File to disk and returns the generated filename. */
+// Resizes + re-encodes as WebP in memory; the original upload is never written to disk.
 export async function saveUploadedPhoto(file: File): Promise<{ filename: string }> {
 	await ensureUploadDir();
-	const filename = `${randomUUID()}${safeExtension(file.name)}`;
-	const buffer = Buffer.from(await file.arrayBuffer());
+	const filename = `${randomUUID()}.webp`;
+	const original = Buffer.from(await file.arrayBuffer());
+	const buffer = await sharp(original)
+		.rotate() // bake in EXIF orientation before it gets stripped by re-encoding
+		.resize({ width: MAX_WIDTH, withoutEnlargement: true })
+		.webp({ quality: WEBP_QUALITY })
+		.toBuffer();
 	await writeFile(path.join(UPLOAD_DIR, filename), buffer);
 	return { filename };
 }

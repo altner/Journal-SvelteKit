@@ -185,6 +185,8 @@
 <style>
 	.prose {
 		padding: 24px 20px;
+		max-width: 620px;
+		margin: 0 auto;
 	}
 	h1 {
 		font-size: 22px;

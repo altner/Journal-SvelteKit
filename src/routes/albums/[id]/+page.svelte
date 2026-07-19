@@ -1,9 +1,10 @@
 <script lang="ts">
-	import { pushState, replaceState } from '$app/navigation';
+	import { pushState, replaceState, invalidateAll, goto } from '$app/navigation';
 	import { enhance } from '$app/forms';
 	import { page } from '$app/state';
 	import type { PageData } from './$types';
 	import PhotoLightbox from '$lib/components/PhotoLightbox.svelte';
+	import DeleteAlbumButton from '$lib/components/DeleteAlbumButton.svelte';
 
 	let { data }: { data: PageData } = $props();
 
@@ -43,6 +44,16 @@
 		else if (e.key === 'ArrowLeft' && photos.length > 1) goToIndex(activeIndex - 1);
 	}
 
+	async function handlePhotoDeleted() {
+		const deletedIndex = activeIndex;
+		await invalidateAll();
+		if (photos.length === 0) {
+			close();
+			return;
+		}
+		goToIndex(deletedIndex);
+	}
+
 	$effect(() => {
 		if (!activePhoto) return;
 		document.body.style.overflow = 'hidden';
@@ -68,7 +79,12 @@
 
 <div class="page">
 	<a class="back" href="/albums">← Alle Alben</a>
-	<h1>{data.album.title}</h1>
+	<div class="album-header">
+		<h1>{data.album.title}</h1>
+		{#if data.user}
+			<DeleteAlbumButton albumId={data.album.id} afterDelete={() => goto('/albums')} />
+		{/if}
+	</div>
 
 	{#if data.album.originPostId}
 		<a class="origin" href="/posts/{data.album.originPostId}">Zum Ursprungs-Post</a>
@@ -133,6 +149,8 @@
 		onClose={close}
 		onPrev={photos.length > 1 ? () => goToIndex(activeIndex - 1) : undefined}
 		onNext={photos.length > 1 ? () => goToIndex(activeIndex + 1) : undefined}
+		deleteAction={data.user ? `/albums/${data.album.id}?/deletePhoto` : undefined}
+		onDeleted={handlePhotoDeleted}
 	/>
 {/if}
 
@@ -142,6 +160,12 @@
 		color: var(--fb-gray);
 		display: inline-block;
 		margin-bottom: 8px;
+	}
+	.album-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
 	}
 	h1 {
 		font-size: 20px;
@@ -208,6 +232,11 @@
 		display: grid;
 		grid-template-columns: repeat(3, 1fr);
 		gap: 4px;
+	}
+	@media (min-width: 768px) {
+		.grid {
+			grid-template-columns: repeat(4, 1fr);
+		}
 	}
 	.tile {
 		display: block;

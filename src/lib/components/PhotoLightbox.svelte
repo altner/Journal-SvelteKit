@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
+
 	type Photo = { id: string; filename: string };
 
 	// Prev/next/close are always real <a href> links (deep-linkable, work without JS).
@@ -11,7 +13,9 @@
 		closeHref,
 		onPrev,
 		onNext,
-		onClose
+		onClose,
+		deleteAction,
+		onDeleted
 	}: {
 		photo: Photo;
 		prevHref?: string;
@@ -20,7 +24,17 @@
 		onPrev?: () => void;
 		onNext?: () => void;
 		onClose?: () => void;
+		deleteAction?: string;
+		onDeleted?: () => void | Promise<void>;
 	} = $props();
+
+	let deleteError = $state<string | undefined>();
+
+	function onDeleteSubmit(e: SubmitEvent) {
+		if (!confirm('Dieses Foto wirklich löschen?')) {
+			e.preventDefault();
+		}
+	}
 
 	function isPlainClick(e: MouseEvent) {
 		return e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey;
@@ -41,6 +55,34 @@
 
 <div class="lightbox" role="presentation" onclick={onBackdropClick}>
 	<a class="close" href={closeHref} onclick={intercept(onClose)} aria-label="Schließen">✕</a>
+
+	{#if deleteAction}
+		<form
+			method="POST"
+			action={deleteAction}
+			class="delete-form"
+			onsubmit={onDeleteSubmit}
+			use:enhance={() => {
+				return async ({ result, update }) => {
+					if (result.type === 'failure') {
+						deleteError = result.data?.error as string | undefined;
+						await update();
+						return;
+					}
+					deleteError = undefined;
+					if (onDeleted) {
+						await onDeleted();
+					} else {
+						await update();
+					}
+				};
+			}}
+		>
+			<input type="hidden" name="photoId" value={photo.id} />
+			<button type="submit" class="delete" aria-label="Foto löschen">🗑</button>
+		</form>
+		{#if deleteError}<span class="delete-error">{deleteError}</span>{/if}
+	{/if}
 
 	{#if prevHref}
 		<a class="nav prev" href={prevHref} onclick={intercept(onPrev)} aria-label="Vorheriges Foto"
@@ -96,6 +138,38 @@
 		height: 40px;
 		font-size: 18px;
 	}
+	.delete-form {
+		position: absolute;
+		top: 16px;
+		right: 64px;
+	}
+	.delete {
+		position: static;
+		border: none;
+		border-radius: 50%;
+		background: rgba(255, 255, 255, 0.15);
+		color: #fff;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 40px;
+		height: 40px;
+		font-size: 16px;
+	}
+	.delete:hover {
+		background: rgba(255, 255, 255, 0.3);
+	}
+	.delete-error {
+		position: absolute;
+		top: 60px;
+		right: 16px;
+		background: rgba(0, 0, 0, 0.7);
+		color: #ff8a80;
+		font-size: 12px;
+		padding: 4px 8px;
+		border-radius: 4px;
+	}
 	.nav {
 		top: 50%;
 		transform: translateY(-50%);
@@ -108,5 +182,34 @@
 	}
 	.nav.next {
 		right: 16px;
+	}
+	@media (min-width: 1024px) {
+		.close {
+			top: 32px;
+			right: 32px;
+			width: 48px;
+			height: 48px;
+			font-size: 20px;
+		}
+		.nav {
+			width: 56px;
+			height: 56px;
+			font-size: 32px;
+		}
+		.nav.prev {
+			left: 32px;
+		}
+		.nav.next {
+			right: 32px;
+		}
+		.delete-form {
+			top: 32px;
+			right: 88px;
+		}
+		.delete {
+			width: 48px;
+			height: 48px;
+			font-size: 18px;
+		}
 	}
 </style>

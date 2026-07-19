@@ -1,6 +1,5 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import PostComposer from '$lib/components/PostComposer.svelte';
 	import PostCard from '$lib/components/PostCard.svelte';
 	let { data }: { data: PageData } = $props();
 
@@ -8,22 +7,15 @@
 </script>
 
 <svelte:head>
-	<title>achis.blog</title>
+	<title>#{data.tag.name} · achis.blog</title>
 </svelte:head>
 
 <div class="page feed">
-	{#if data.user}
-		<PostComposer />
-	{/if}
+	<a class="back" href="/tags">← Alle Tags</a>
+	<h1 class="tag-heading">#{data.tag.name}</h1>
 
 	{#if data.posts.length === 0}
-		<p class="empty">
-			{#if data.user}
-				Noch keine Posts.
-			{:else}
-				Noch keine Posts. <a href="/posts/new">Leg los</a>.
-			{/if}
-		</p>
+		<p class="empty">Keine Posts mit diesem Tag.</p>
 	{/if}
 
 	{#each data.posts as p (p.id)}
@@ -43,13 +35,17 @@
 		flex-direction: column;
 		gap: 16px;
 	}
+	.back {
+		font-size: 13px;
+		color: var(--fb-gray);
+	}
+	.tag-heading {
+		font-size: 20px;
+		margin: 0;
+	}
 	.empty {
 		text-align: center;
 		color: var(--fb-gray);
 		margin-top: 40px;
-	}
-	.empty a {
-		color: var(--fb-blue);
-		font-weight: 600;
 	}
 </style>

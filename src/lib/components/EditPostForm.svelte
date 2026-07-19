@@ -1,16 +1,19 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import TagInput from './TagInput.svelte';
 
 	let {
 		postId,
 		title,
 		text,
+		tags = [],
 		onSaved,
 		onCancel
 	}: {
 		postId: string;
 		title: string | null;
 		text: string | null;
+		tags?: string[];
 		onSaved?: () => void;
 		onCancel?: () => void;
 	} = $props();
@@ -44,6 +47,11 @@
 	<label>
 		Text
 		<textarea name="text" rows="3" placeholder="Was möchtest du teilen?">{text ?? ''}</textarea>
+	</label>
+
+	<label>
+		Tags
+		<TagInput name="tags" initialTags={tags} />
 	</label>
 
 	<div class="actions">

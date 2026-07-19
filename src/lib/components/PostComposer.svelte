@@ -1,9 +1,11 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { tick } from 'svelte';
+	import TagInput from './TagInput.svelte';
 
 	let fileCount = $state(0);
 	let error = $state<string | undefined>();
+	let tagInputRef: ReturnType<typeof TagInput> | undefined = $state();
 
 	function todayLocalDate() {
 		const d = new Date();
@@ -11,7 +13,14 @@
 		return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 	}
 
+	function nowLocalTime() {
+		const d = new Date();
+		const pad = (n: number) => String(n).padStart(2, '0');
+		return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+	}
+
 	let dateValue = $state(todayLocalDate());
+	let timeValue = $state(nowLocalTime());
 
 	function onFilesChange(e: Event) {
 		const input = e.currentTarget as HTMLInputElement;
@@ -32,11 +41,13 @@
 				error = undefined;
 				formElement.reset();
 				fileCount = 0;
-				// formElement.reset() clears the date input's DOM value directly without Svelte
-				// noticing, so re-assigning dateValue right away can lose to that reset in the
-				// same tick — wait a tick first so our value wins.
+				tagInputRef?.reset();
+				// formElement.reset() clears the date/time inputs' DOM values directly without
+				// Svelte noticing, so re-assigning right away can lose to that reset in the same
+				// tick — wait a tick first so our values win.
 				await tick();
 				dateValue = todayLocalDate();
+				timeValue = nowLocalTime();
 			}
 			await update();
 		};
@@ -51,15 +62,26 @@
 		<input type="text" name="title" placeholder="Worum geht's?" />
 	</label>
 
-	<label>
-		Datum
-		<input type="date" name="date" bind:value={dateValue} />
-	</label>
+	<div class="date-time-row">
+		<label>
+			Datum
+			<input type="date" name="date" bind:value={dateValue} />
+		</label>
+		<label>
+			Uhrzeit
+			<input type="time" name="time" bind:value={timeValue} />
+		</label>
+	</div>
 	<p class="hint">Für ältere Fotos anpassbar — wirkt sich auf Feed-Reihenfolge, Album und Foto-Stream aus.</p>
 
 	<label>
 		Text
 		<textarea name="text" rows="3" placeholder="Was möchtest du teilen?"></textarea>
+	</label>
+
+	<label>
+		Tags
+		<TagInput name="tags" bind:this={tagInputRef} />
 	</label>
 
 	<label>
@@ -97,6 +119,13 @@
 		gap: 4px;
 		font-size: 13px;
 		color: var(--fb-gray);
+	}
+	.date-time-row {
+		display: flex;
+		gap: 14px;
+	}
+	.date-time-row label {
+		flex: 1;
 	}
 	input[type='text'],
 	textarea {

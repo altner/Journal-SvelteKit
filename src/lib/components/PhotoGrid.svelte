@@ -100,6 +100,11 @@
 		object-fit: cover;
 		display: block;
 	}
+	@media (min-width: 768px) {
+		.single {
+			max-height: 600px;
+		}
+	}
 
 	/* ---------- shared tile mechanics ---------- */
 	.grid {

@@ -1,9 +1,10 @@
-import { error, fail } from '@sveltejs/kit';
+import { error, fail, redirect } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 import { db } from '$lib/server/db';
 import { eq, desc } from 'drizzle-orm';
 import { album, photo, post } from '$lib/server/db/schema';
-import { saveUploadedPhoto } from '$lib/server/storage';
+import { saveUploadedPhoto, deleteUploadedPhoto } from '$lib/server/storage';
+import { deletePostCascade, isPostNowEmpty } from '$lib/server/posts';
 
 export const load: PageServerLoad = async ({ params }) => {
 	const found = await db.query.album.findFirst({
@@ -71,5 +72,62 @@ export const actions: Actions = {
 				position: position++
 			});
 		}
+	},
+
+	deletePhoto: async ({ request, params, locals }) => {
+		const user = locals.user;
+		if (!user) return fail(401, { error: 'Bitte melde dich an.' });
+
+		const data = await request.formData();
+		const photoId = String(data.get('photoId') ?? '');
+
+		const found = await db.query.photo.findFirst({ where: eq(photo.id, photoId) });
+		if (!found || found.albumId !== params.id) {
+			throw error(404, 'Foto nicht gefunden');
+		}
+
+		await deleteUploadedPhoto(found.filename);
+		await db.delete(photo).where(eq(photo.id, found.id));
+
+		const owner = await db.query.post.findFirst({
+			where: eq(post.id, found.postId),
+			with: { photos: true, album: true }
+		});
+
+		if (owner && isPostNowEmpty(owner, owner.photos.length)) {
+			await deletePostCascade(owner);
+		}
+	},
+
+	deleteAlbum: async ({ params, locals }) => {
+		const user = locals.user;
+		if (!user) return fail(401, { error: 'Bitte melde dich an.' });
+
+		const found = await db.query.album.findFirst({
+			where: eq(album.id, params.id),
+			with: { photos: true }
+		});
+		if (!found) throw error(404, 'Album nicht gefunden');
+
+		const contributingPosts = await db.select().from(post).where(eq(post.albumId, found.id));
+
+		for (const p of found.photos) {
+			await deleteUploadedPhoto(p.filename);
+		}
+		await db.delete(photo).where(eq(photo.albumId, found.id));
+
+		for (const p of contributingPosts) {
+			if (p.isStatusPost) {
+				await db.delete(post).where(eq(post.id, p.id));
+			} else {
+				await db.update(post).set({ albumId: null }).where(eq(post.id, p.id));
+				if (!p.title && !p.text) {
+					await db.delete(post).where(eq(post.id, p.id));
+				}
+			}
+		}
+
+		await db.delete(album).where(eq(album.id, found.id));
+		redirect(303, '/albums');
 	}
 };
