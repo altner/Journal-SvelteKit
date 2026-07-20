@@ -13,6 +13,9 @@
 		{ href: '/albums', label: 'Alben' },
 		{ href: '/tags', label: 'Tags' }
 	];
+	// Mobile-Topnav hat weniger Platz als die Desktop-Sidebar - "Alben" bleibt bewusst draußen,
+	// "Tags" soll aber sichtbar sein.
+	const mobileNavItems = navItems.filter((item) => item.href !== '/albums');
 
 	const isLoginPage = $derived(page.url.pathname === '/login');
 	const isFeedPage = $derived(page.url.pathname === '/');
@@ -27,7 +30,7 @@
 		<div class="topnav-inner">
 			<span class="brand">📓 achis.blog</span>
 			<div class="nav-links">
-				{#each navItems.slice(0, 2) as item (item.href)}
+				{#each mobileNavItems as item (item.href)}
 					<a href={item.href} class:active={page.url.pathname === item.href}>{item.label}</a>
 				{/each}
 			</div>

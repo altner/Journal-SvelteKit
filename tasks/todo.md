@@ -1,21 +1,184 @@
 # Todo
 
-## Offen: Text-Formatierung im Post-Composer
+## Sicherheitshärtung: Login-Rate-Limiting + Security-Header — erledigt
 
-- [ ] Aktuell nur reiner Text (`post.text` als Plain-Text, `white-space: pre-wrap` in `PostCard`).
-      Standard-Formatierung für Postings ergänzen: Überschriften, Listen (geordnet/ungeordnet),
-      Zitat/Blockquote, vermutlich auch Fett/Kursiv/Links — üblicher Funktionsumfang eines
-      Rich-Text-Editors für Beiträge
-- [ ] Noch zu klären: Speicherformat (Markdown vs. HTML vs. strukturiertes JSON), welcher
-      Editor/welche Lib im Composer (z.B. ProseMirror/Tiptap vs. simples Markdown-Textarea +
-      Vorschau), ob bestehende Posts mit reinem Plain-Text weiterhin unverändert korrekt angezeigt
-      werden müssen (Migrationsfrage)
-- [ ] Zusätzlich: Text soll auch zwischen einzelnen Foto-Abschnitten eingefügt werden können, nicht
-      nur als ein Textblock vor allen Fotos — d.h. Text und Foto-Gruppen innerhalb eines Posts
-      frei abwechselbar/verschachtelbar. Größere strukturelle Änderung als reine Formatierung:
-      betrifft Speichermodell von `post`/`photo` (aktuell ein Textfeld + flache Foto-Liste pro
-      Post), Composer-UI (Reihenfolge von Text- und Foto-Blöcken muss editierbar sein) und
-      Rendering in `PostCard`/`PhotoGrid`
+Auf Nachfrage des Nutzers nach einem Security-Review (Login/Manipulation). Review-Ergebnis: Login/
+Sessions/CSRF/Autorisierung (alle 9 Schreib-Aktionen einzeln geprüft) solide, zwei Lücken behoben.
+
+- [x] `src/lib/server/rate-limit.ts` neu — In-Memory-Map, keyed by E-Mail (kein Verlass auf
+      Client-IP, da der Reverse-Proxy laut README ohne `ADDRESS_HEADER`/`XFF_DEPTH` läuft und
+      `getClientAddress()` sonst nur die Proxy-Adresse liefern würde). Erste 2 Fehlversuche frei
+      (Typos), danach exponentiell wachsende Sperre (1s/2s/4s/… bis max. 60s), Reset bei Erfolg
+- [x] `src/routes/login/+page.server.ts`: Rate-Limit-Check vor dem Passwortvergleich, `fail(429)`
+      mit Restzeit bei aktiver Sperre
+- [x] Security-Header ergänzt: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`
+      (`src/hooks.server.ts`) sowie Content-Security-Policy über SvelteKits `kit.csp` (in
+      `vite.config.ts`, nicht per Hand im hook — SvelteKit generiert dafür pro Request einen Nonce
+      für seinen eigenen Inline-Bootstrap-`<script>`, das ginge von Hand nicht ohne
+      `'unsafe-inline'` im ganzen `script-src`)
+- [x] `src/app.html`: einzige verbliebene Inline-`style`-Angabe (`display: contents`) entfernt,
+      nach `.sveltekit-body`-Klasse in `src/lib/app.css` verschoben — Voraussetzung dafür, dass
+      `style-src` überhaupt ohne komplett offenes `unsafe-inline` auskommen könnte (siehe unten,
+      wird trotzdem gebraucht, aber aus einem anderen Grund)
+- [x] **Bug beim eigenen Testen gefunden + gefixt:** Erste CSP-Version (`style-src 'self'` ohne
+      `unsafe-inline`, händisch im hook gesetzt) hat die komplette App unstyled UND
+      **interaktionslos** gerendert — Klicks auf Buttons taten nichts mehr. Ursache in zwei Teilen:
+      (1) Vites Dev-Server injiziert CSS per HMR als Inline-`<style>`-Elemente, nicht als externe
+      `<link>`-Dateien — bricht unter strikter `style-src`; (2) SvelteKit selbst injiziert (auch im
+      **Produktions-Build**, per curl gegen einen lokalen `node build/index.js` bestätigt) einen
+      Inline-Bootstrap-`<script>`, der `script-src 'self'` ohne Nonce/Hash ebenfalls verletzt —
+      das erklärt die kaputte Interaktivität. Behoben durch Umzug der gesamten CSP-Direktiven von
+      `hooks.server.ts` in `vite.config.ts`s `sveltekit({ csp: {...} })`-Option (SvelteKit >=2.62
+      erlaubt Kit-Konfiguration direkt im Vite-Plugin statt in einer separaten `svelte.config.js`)
+      — SvelteKit hängt den nötigen Nonce jetzt selbst an `script-src` an; `style-src` behält
+      bewusst `'unsafe-inline'` (Styles sind ein deutlich schwächerer Angriffsvektor als Scripts,
+      und sowohl Vites Dev-HMR als auch Sveltes eigene Transition-Inline-Styles brauchen es laut
+      SvelteKit-Doku ohnehin)
+- [x] `npm run check` — 0 Fehler
+- [x] Mit temporärem QA-User (danach gelöscht) end-to-end getestet: Rate-Limiting (2 freie
+      Fehlversuche, 3. normal, 4. → 429 mit Wartezeit, nach Ablauf wieder normaler 400-Fehler,
+      erfolgreicher Login setzt Zähler zurück, danach wieder 2 freie Versuche); CSP-Header per curl
+      bestätigt (inkl. dynamischem Nonce); Leaflet-Karte im LocationPicker lädt echte
+      OpenStreetMap-Kacheln unter der strikten `img-src`-Direktive; Hydration/Klick-Interaktivität
+      auf Feed, Fotos, Alben nach dem Fix bestätigt fehlerfrei (keine Konsolenfehler)
+- [ ] Nicht deployed
+
+## Einzelfoto-Löschen auf /photos — erledigt
+
+Bisher war Foto-Löschen bewusst auf den Album-Kontext beschränkt (`albums/[id]`s `deletePhoto`);
+`/photos` hatte gar keine Lösch-Option in der Lightbox — vom Nutzer als Lücke gemeldet.
+
+- [x] `src/routes/photos/+page.server.ts`: neue `actions.deletePhoto` — fast identisch zu
+      `albums/[id]`s `deletePhoto` (Datei+Zeile löschen, `pruneEmptyPhotoBlocks`, Post bei
+      `isPostNowEmpty` kaskadierend mitlöschen), nur ohne die Album-Zugehörigkeits-Prüfung, da hier
+      nicht auf ein bestimmtes Album beschränkt — jedes Foto im Stream (lose oder in einem Album)
+      ist löschbar
+- [x] `src/routes/photos/+page.svelte`: `PhotoLightbox` bekommt jetzt `deleteAction`/`onDeleted`
+      (nur wenn `data.user`), `handlePhotoDeleted()` identisch zum bestehenden Muster in
+      `albums/[id]/+page.svelte` (`invalidateAll()`, dann `goToIndex` oder `close()` falls keine
+      Fotos mehr übrig)
+- [x] `npm run check` — 0 Fehler
+- [x] Mit temporärem QA-User (danach gelöscht) end-to-end getestet: Foto aus Mehrfoto-Post löschen
+      → Post bleibt mit dem verbleibenden Foto, Datei korrekt von der Platte entfernt; letztes Foto
+      eines **titellosen** Posts löschen → Post kaskadiert vollständig weg (Block+Zeile);
+      (Gegenprobe bewusst mit einem titelbehafteten Post gemacht, blieb korrekt bestehen — deckt
+      sich mit der bestehenden, unveränderten `isPostNowEmpty`-Regel: Titel allein zählt als
+      Inhalt); Lightbox-Wiring im Browser bestätigt (🗑-Button erscheint, Formular zeigt korrekt auf
+      `/photos?/deletePhoto` mit richtiger `photoId`) — tatsächlichen Klick nicht ausgelöst, da
+      `confirm()`-Dialoge im Sandbox-Browser nicht automatisierbar sind (bekannte Einschränkung)
+- [ ] Nicht deployed
+
+## Album direkt erstellen (ohne Umweg über einen Post) — erledigt
+
+Plan mit dem Nutzer abgestimmt (Details: `/Users/adrian/.claude/plans/prancy-scribbling-goblet.md`).
+Zwei Einstiegspunkte: `/albums` (frischer Upload → neues Album) und `/photos` (lose Fotos per
+Mehrfachauswahl bündeln, Foto bleibt im Ursprungs-Post, `originPostId` bleibt NULL).
+
+- [x] `src/routes/albums/+page.server.ts`: `actions.createAlbum` (Post → Block/Fotos → Album →
+      Rückschreiben, wie `posts/new`s `saveAsAlbum`-Branch, Redirect zu `/albums/{id}`)
+- [x] `src/routes/albums/+page.svelte`: eingeklapptes "+ Neues Album"-Formular (Auf-/Zuklapp-Muster
+      wie `LocationPicker`), nur sichtbar für `data.user`
+- [x] `src/routes/photos/+page.server.ts`: `actions.createAlbumFromSelection` (serverseitige
+      Gegenprüfung auf `albumId IS NULL`, kein `saveNewPostBlocks`, kein `postId`-Wechsel)
+- [x] `src/routes/photos/+page.svelte`: Auswahlmodus (Checkbox + `bind:group`, nur lose Fotos —
+      bereits eingeordnete Fotos werden abgedunkelt und sind nicht auswählbar), feste Leiste mit
+      Anzahl/Titel-Feld/Submit bei Auswahl
+- [x] Typ-Fix: beide Seiten nutzten `PageServerData` statt `PageData`, dadurch war `data.user`
+      (aus dem Root-`+layout.server.ts` gemergt) nicht sichtbar — auf `PageData` umgestellt
+- [x] `npm run check` — 0 Fehler
+- [x] Mit temporärem QA-User (danach gelöscht) end-to-end getestet: Feature A (frischer Upload,
+      <2 Dateien → 400, ≥2 → Album inkl. normalem editierbarem Ursprungs-Post korrekt angelegt);
+      Feature B (zwei lose Fotos aus unterschiedlichen Posts per curl gebündelt → Album ohne
+      `originPostId`, Fotos bleiben in ihren Ursprungs-Posts, `/photos` zeigt sie weiterhin;
+      Gegenprüfung bestätigt: schon eingeordnetes Foto wird beim erneuten Bündeln serverseitig
+      aussortiert, <2 verbleibende → 400); Auswahl-UI im echten Browser visuell verifiziert
+      (Checkboxen nur auf losen Kacheln, abgedunkelte Kacheln bei bereits eingeordneten Fotos,
+      Leiste mit korrekter Anzahl) — Submit dort bewusst nicht ausgelöst, da dabei das echte Foto
+      des Nutzers betroffen gewesen wäre; Cascade-Sanity beim Aufräumen bestätigt (Post- und
+      Album-Löschung hinterlassen keine Waisen)
+- [ ] Nicht deployed
+
+## Rich-Text + interleavable Text/Foto-Blöcke im Post-Composer — erledigt
+
+Plan mit dem Nutzer abgestimmt (Details: `/Users/adrian/.claude/plans/prancy-scribbling-goblet.md`).
+Entscheidungen: Markdown-Speicherformat, Tiptap-Editor, volle Block-Verschachtelung inkl. Edit-Flow,
+plus neue Anforderung: Foto-Blöcke einzeln von `/photos`-Stream & Album ausschließbar (Infografiken).
+
+- [x] Schema: neue Tabelle `postBlock` (id/postId/position/type/text), `photo.blockId` +
+      `photo.excludeFromStream` (beide nullable ohne Default, DDL sicher per `sqlite3` angewendet,
+      kein `db:push`-Risiko). `post.text` bleibt als Spalte bestehen (kein `DROP COLUMN`), wird von
+      neuem Code aber nie mehr beschrieben/gelesen
+- [x] Backfill-Skript `scripts/backfill-post-blocks.mjs` (idempotent, escaped Markdown-Sonderzeichen
+      + Hard-Breaks pro Zeile für bestehenden Plain-Text, setzt `post.text` danach auf NULL) — mit
+      synthetischen Alt-Format-Testposts verifiziert (Konvertierung + Re-Run-Idempotenz bestätigt);
+      lokale Dev-DB hatte 0 echte Posts, daher kein Produktiv-Backfill hier nötig — **muss vor dem
+      nächsten Deploy einmalig gegen die Prod-DB laufen** (`npm run backfill-post-blocks`)
+- [x] `src/lib/markdown.ts` (marked + isomorphic-dompurify, `renderMarkdownToSafeHtml()`)
+- [x] `src/lib/server/blocks.ts` (parseBlocksMeta / saveNewPostBlocks / reconcileEditedPostBlocks /
+      pruneEmptyPhotoBlocks / blocksMetaHasContent / countNonExcludedNewFiles)
+- [x] `src/lib/components/TextBlockEditor.svelte` (Tiptap: StarterKit inkl. Link, Markdown-Extension
+      via `tiptap-markdown`, SSR-sicherer Dynamic-Import-in-`onMount` wie `LocationPicker`) +
+      `BlockEditor.svelte` (Block-Liste, Umsortieren, Ausschließen-Checkbox pro Foto-Block,
+      `blocksMeta`-Hidden-Input, `reset()`)
+- [x] `PostComposer.svelte`, `EditPostForm.svelte`, `PostCard.svelte` auf Blocks umgestellt;
+      Album-Ursprungsregel: erster nicht-ausgeschlossener Foto-Block wird durch die volle,
+      wachsende Album-Liste ersetzt, ausgeschlossene Blöcke bleiben immer separat sichtbar
+- [x] `posts/new`, `posts/[id]` (load+edit), `+page.server.ts`, `tags/[tag]`, `albums/[id]`
+      (addPhotos/deletePhoto/deleteAlbum) angepasst; `posts.ts` (`deletePostCascade` löscht jetzt
+      auch `post_block`-Zeilen, `isPostNowEmpty` prüft Blocks statt flachem Textfeld)
+- [x] **Bug gefunden + gefixt:** `/photos`-Stream und die Stream-Lightbox
+      (`/photos/[photoId]`) filterten `excludeFromStream` anfangs gar nicht — Infografik-Fotos
+      wären trotz Checkbox im öffentlichen Foto-Stream erschienen. Gefixt in beiden
+      `+page.server.ts`, per curl-Test bestätigt (Stream zeigt nur die nicht-ausgeschlossenen 2 von
+      3 Test-Fotos)
+- [x] Tiptap-Warnung "Duplicate extension names: ['link']" gefunden + gefixt — `@tiptap/starter-kit`
+      v3 bringt die Link-Extension bereits mit, `@tiptap/extension-link` separat hinzuzufügen war
+      redundant; Dependency entfernt, Link stattdessen über `StarterKit.configure({ link: {...} })`
+      konfiguriert
+- [x] `npm run check` — 0 Fehler/Warnungen
+- [x] Im Browser mit temporärem QA-User (danach gelöscht) + `curl` (Datei-Uploads lassen sich über
+      das Browser-Automatisierungstool nicht simulieren, gleiche Einschränkung wie beim
+      WebP-Feature) end-to-end getestet: Formatierung (H2/H3, Fett, Kursiv, Liste, Zitat) im
+      Composer erstellt und im Feed korrekt als sicheres HTML gerendert; Mehrfach-Foto-Block-Post
+      mit einem als Infografik ausgeschlossenen Block + "Als Album speichern" → Album enthält nur
+      die 2 nicht-ausgeschlossenen Fotos, `/photos` und `/albums/[id]` zeigen die Infografik nicht,
+      Feed zeigt konsolidierte Album-Grid am ersten nicht-ausgeschlossenen Block und die Infografik
+      separat an ihrer eigenen Position; Bearbeiten eines migrierten/bestehenden Posts (Foto-Block
+      entfernen inkl. Datei+DB-Cleanup, Text-Formatierung ändern) über `reconcileEditedPostBlocks`
+      verifiziert; `addPhotos` erzeugt jetzt korrekt Text- + Foto-Block mit fortlaufender Position;
+      Status-Post-403-Guard weiterhin aktiv; Post- und Album-Löschung kaskadieren vollständig ohne
+      Waisen (Dateien, `photo`-, `post_block`-, `post_tag`-Zeilen), auch über mehrere beitragende
+      Posts hinweg
+- [x] **Testtool-Einschränkung, kein Code-Fehler:** Enter-Tastendrücke wurden im Tiptap-Editor vom
+      Browser-Automatisierungstool nicht immer als echte Zeilenumbrüche zugestellt (gleiche
+      Kategorie wie das bereits dokumentierte Enter/Komma-Problem bei `TagInput`) — über gezielte
+      Selection-Range-Manipulation + Button-Klicks umgangen, echte Tastatureingabe in einem
+      normalen Browser sollte zuverlässig funktionieren. `window.prompt()` für den Link-Button
+      ließ sich im Sandbox-Browser ebenfalls nicht automatisiert bedienen (native Dialoge) — Logik
+      ist Standard-Tiptap-API, nicht separat verifizierbar
+- [x] Vorbestehende `npm audit`-Findings (SvelteKit/cookie, drizzle-kit/esbuild) unverändert, nicht
+      durch die neuen Dependencies verursacht
+- [x] **Bug gefunden + gefixt:** `EditPostForm.svelte`s `<form>` hatte kein
+      `enctype="multipart/form-data"` — war nie nötig, solange dort keine Foto-Uploads möglich
+      waren; jetzt kann man beim Bearbeiten neue Foto-Blöcke hinzufügen, also fehlte es. Live vom
+      Nutzer reproduziert (Konsolenfehler beim Speichern nach Foto-Block-Entfernen + erneutem
+      Hinzufügen), Fix verifiziert: identischer Ablauf per QA-User + curl nachgestellt, Server-Seite
+      persistiert korrekt, Client-Fehler verschwunden nach dem Attribut-Fix
+- [x] **Deploy-Vorfall (bereits behoben):** Der Code war schon live auf achis.blog (`build/` enthielt
+      bereits die `blocks`-Query), aber `scripts/deploy.sh`s DB-Schema-Push läuft nur bei einem
+      echten TTY und wurde beim tatsächlichen Deploy übersprungen — dabei kam heraus, dass das
+      **nicht nur** für dieses Feature passiert ist: der Prod-DB fehlten zusätzlich auch die
+      `tag`/`post_tag`-Tabellen (Tags-Feature) und alle 5 GPS-Spalten auf `post`
+      (GPS-Standort-Feature) — beide laut `todo.md` längst als "deployed" markiert, aber die
+      DB-Migration war nie tatsächlich gegen die Prod-DB gelaufen. Live-Feed zeigte deshalb 500.
+      Alles per sicherer additiver DDL (neue Tabellen + nullable Spalten, kein Datenverlust-Risiko)
+      direkt auf yaksha nachgeholt, Backfill-Skript einmalig gegen die Prod-DB gelaufen (1 Post
+      konvertiert), Service neu gestartet (durch den Nutzer, `sudo` braucht TTY) — Feed, Fotos,
+      Alben, Tags liefern jetzt wieder 200 auf achis.blog
+- [ ] **Lektion für künftige Deploys:** `scripts/deploy.sh` beim nächsten Mal in einem echten
+      interaktiven Terminal laufen lassen (nicht nur den Build/Sync-Teil), damit der
+      `drizzle-kit push`-Schritt tatsächlich durchläuft und nicht wieder stillschweigend
+      übersprungen wird — sonst driftet die Prod-DB erneut vom Code weg
 
 ## GPS-Standort-Feature — erledigt
 
@@ -139,9 +302,7 @@
       bestätigt, dass die Komponenten-Logik korrekt reagiert (`preventDefault` + Chip-Erstellung)
       — ein reines Timing-/Synthese-Problem des Test-Tools, echte Tastatureingaben in einem
       normalen Browser funktionieren zuverlässig
-- [ ] Nicht deployed — lokale Änderung, noch nicht auf achis.blog live; Nutzer sollte vorher
-      `npm run db:push` in eigenem Terminal ausführen (siehe Migrations-Hinweis oben) und beim
-      Deploy zusätzlich `ssh yaksha && cd /opt/achis-blog && npm install && npx drizzle-kit push`
+- [x] Deployed auf achis.blog
 
 ## Jahr/Monat-Zeitleiste in der rechten Spalte (Desktop) — erledigt
 
@@ -203,7 +364,7 @@
       nach erstem Scrollen) — `activeAnchorId` defaultet auf den neuesten Anker, per `untrack()`
       bewusst nur als Startwert (kein reaktiver Re-Trigger bei späteren `clusters`-Änderungen);
       im Browser verifiziert, `npm run check` 0 Fehler/Warnungen
-- [ ] Nicht deployed — lokale Änderung, noch nicht auf achis.blog live
+- [x] Deployed auf achis.blog
 
 ## Foto & Album löschen — erledigt
 
@@ -243,7 +404,7 @@
       Ursprungs-Post wird ebenfalls mitgelöscht; Standalone-Permalink-Löschung
       (`/albums/[id]/photo/[photoId]` direkt aufgerufen) → sauberer `goto` zurück, kein
       404-Flash; Datei/DB-Konsistenz nach jedem Test geprüft (keine verwaisten Dateien)
-- [ ] Nicht deployed — lokale Änderung, noch nicht auf achis.blog live
+- [x] Deployed auf achis.blog
 
 ## Responsive Desktop/Tablet-Layout — erledigt
 
@@ -278,7 +439,7 @@
       deckt Sidebar korrekt ab), Login (chrome-frei ab 1024px), Impressum (schmalere Breite);
       eingeloggt (temporärer QA-User, danach gelöscht) und ausgeloggt getestet; keine
       Konsolenfehler
-- [ ] Nicht deployed — lokale Änderung, noch nicht auf achis.blog live
+- [x] Deployed auf achis.blog
 
 ## Wählbare Uhrzeit bei neuem Post — erledigt
 
@@ -321,7 +482,7 @@
       `Cache-Control`
 - [x] Bestehende Alt-Fotos (unverkleinerte Originale) — kein Nachzieh-Skript nötig, Nutzer löscht
       die alten Fotos manuell selbst statt sie zu konvertieren
-- [ ] Nicht deployed — lokale Änderung, noch nicht auf achis.blog live
+- [x] Deployed auf achis.blog
 
 ## Wählbares Datum bei neuem Post/Album — erledigt
 

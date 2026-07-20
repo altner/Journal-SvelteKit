@@ -14,6 +14,28 @@ export default defineConfig({
 				config: (config) => {
 					config.include.push('../drizzle.config.ts');
 				}
+			},
+			// SvelteKit generates a per-request nonce for its own inline bootstrap <script> (and any
+			// inline <style> from Svelte transitions) and adds it to these directives automatically -
+			// that's why script-src can stay strict here without 'unsafe-inline', unlike a hand-rolled
+			// CSP header. style-src still needs 'unsafe-inline': Vite's dev server injects HMR CSS via
+			// inline <style> elements that SvelteKit's nonce machinery doesn't cover, and Svelte
+			// transitions do the same in production - see the `csp` config docs. The only external
+			// origin needed anywhere is tile.openstreetmap.org (Leaflet map tiles in LocationPicker);
+			// Nominatim is only ever called server-side (api/reverse-geocode), so it never appears here.
+			csp: {
+				mode: 'auto',
+				directives: {
+					'script-src': ['self'],
+					'style-src': ['self', 'unsafe-inline'],
+					'img-src': ['self', 'data:', 'https://tile.openstreetmap.org'],
+					'font-src': ['self'],
+					'connect-src': ['self'],
+					'object-src': ['none'],
+					'base-uri': ['self'],
+					'frame-ancestors': ['none'],
+					'form-action': ['self']
+				}
 			}
 		})
 	],

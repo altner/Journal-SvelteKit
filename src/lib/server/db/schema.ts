@@ -62,6 +62,16 @@ export const post = sqliteTable('post', {
 		.$defaultFn(() => new Date())
 });
 
+export const postBlock = sqliteTable('post_block', {
+	id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+	postId: text('post_id')
+		.notNull()
+		.references(() => post.id, { onDelete: 'cascade' }),
+	position: integer('position').notNull(), // order within the post, 0-based
+	type: text('type', { enum: ['text', 'photos'] }).notNull(),
+	text: text('text') // markdown, only set for type='text'
+});
+
 export const photo = sqliteTable('photo', {
 	id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
 	filename: text('filename').notNull(), // name on disk, served via /uploads/[filename]
@@ -72,6 +82,12 @@ export const photo = sqliteTable('photo', {
 	// set only when this photo also belongs to an album; single photos stay null
 	// and remain in the general photo stream.
 	albumId: text('album_id').references(() => album.id, { onDelete: 'set null' }),
+	// which of the post's ordered blocks this photo belongs to.
+	blockId: text('block_id').references(() => postBlock.id, { onDelete: 'cascade' }),
+	// nullable, no default (like the GPS columns) so `db:push` can only ever emit a lossless
+	// ADD COLUMN here — NULL means "not excluded", same as false. Never filter with a plain
+	// eq(excludeFromStream, false), always treat NULL as included too.
+	excludeFromStream: integer('exclude_from_stream', { mode: 'boolean' }),
 	position: integer('position').notNull().default(0),
 	createdAt: integer('created_at', { mode: 'timestamp' })
 		.notNull()
@@ -118,7 +134,13 @@ export const postRelations = relations(post, ({ one, many }) => ({
 	author: one(user, { fields: [post.authorId], references: [user.id] }),
 	album: one(album, { fields: [post.albumId], references: [album.id] }),
 	photos: many(photo),
+	blocks: many(postBlock),
 	tags: many(postTag)
+}));
+
+export const postBlockRelations = relations(postBlock, ({ one, many }) => ({
+	post: one(post, { fields: [postBlock.postId], references: [post.id] }),
+	photos: many(photo)
 }));
 
 export const albumRelations = relations(album, ({ one, many }) => ({
@@ -128,7 +150,8 @@ export const albumRelations = relations(album, ({ one, many }) => ({
 
 export const photoRelations = relations(photo, ({ one }) => ({
 	post: one(post, { fields: [photo.postId], references: [post.id] }),
-	album: one(album, { fields: [photo.albumId], references: [album.id] })
+	album: one(album, { fields: [photo.albumId], references: [album.id] }),
+	block: one(postBlock, { fields: [photo.blockId], references: [postBlock.id] })
 }));
 
 export const tagRelations = relations(tag, ({ many }) => ({

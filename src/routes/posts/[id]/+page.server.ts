@@ -5,12 +5,16 @@ import { eq } from 'drizzle-orm';
 import { post } from '$lib/server/db/schema';
 import { deletePostCascade } from '$lib/server/posts';
 import { setPostTags, parseTagsField } from '$lib/server/tags';
+import { parseBlocksMeta, reconcileEditedPostBlocks, blocksMetaHasContent } from '$lib/server/blocks';
 
 export const load: PageServerLoad = async ({ params }) => {
 	const found = await db.query.post.findFirst({
 		where: eq(post.id, params.id),
 		with: {
-			photos: { orderBy: (photo, { asc }) => asc(photo.position) },
+			blocks: {
+				orderBy: (block, { asc }) => asc(block.position),
+				with: { photos: { orderBy: (photo, { asc }) => asc(photo.position) } }
+			},
 			album: {
 				with: {
 					photos: { orderBy: (photo, { asc }) => asc(photo.position) }
@@ -45,7 +49,7 @@ export const actions: Actions = {
 
 		const found = await db.query.post.findFirst({
 			where: eq(post.id, params.id),
-			with: { photos: true }
+			with: { blocks: { with: { photos: true } } }
 		});
 		if (!found) throw error(404, 'Post nicht gefunden');
 
@@ -55,8 +59,8 @@ export const actions: Actions = {
 
 		const data = await request.formData();
 		const title = String(data.get('title') ?? '').trim();
-		const text = String(data.get('text') ?? '').trim();
 		const rawTags = parseTagsField(data.get('tags'));
+		const blocksMeta = parseBlocksMeta(data.get('blocksMeta'));
 
 		const latitudeRaw = Number(data.get('latitude'));
 		const longitudeRaw = Number(data.get('longitude'));
@@ -68,7 +72,11 @@ export const actions: Actions = {
 		const locationCountry = String(data.get('locationCountry') ?? '').trim();
 		const locationName = String(data.get('locationName') ?? '').trim();
 
-		if (!text && found.photos.length === 0) {
+		const existingPhotoBlockIds = new Set(
+			found.blocks.filter((b) => b.type === 'photos').map((b) => b.id)
+		);
+
+		if (!blocksMetaHasContent(blocksMeta, data, existingPhotoBlockIds)) {
 			return fail(400, { error: 'Bitte gib einen Text ein.' });
 		}
 
@@ -76,7 +84,6 @@ export const actions: Actions = {
 			.update(post)
 			.set({
 				title: title || null,
-				text: text || null,
 				latitude: hasLocation ? latitudeRaw : null,
 				longitude: hasLocation ? longitudeRaw : null,
 				locationPlace: locationPlace || null,
@@ -86,5 +93,6 @@ export const actions: Actions = {
 			.where(eq(post.id, found.id));
 
 		await setPostTags(found.id, rawTags);
+		await reconcileEditedPostBlocks(found.id, found.blocks, blocksMeta, data);
 	}
 };

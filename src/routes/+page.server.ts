@@ -8,7 +8,10 @@ export const load: PageServerLoad = async () => {
 	const posts = await db.query.post.findMany({
 		orderBy: desc(post.createdAt),
 		with: {
-			photos: { orderBy: (photo, { asc }) => asc(photo.position) },
+			blocks: {
+				orderBy: (block, { asc }) => asc(block.position),
+				with: { photos: { orderBy: (photo, { asc }) => asc(photo.position) } }
+			},
 			album: {
 				with: {
 					photos: { orderBy: (photo, { asc }) => asc(photo.position) }

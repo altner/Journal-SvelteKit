@@ -2,6 +2,12 @@
 	import PhotoGrid from './PhotoGrid.svelte';
 	import DeletePostButton from './DeletePostButton.svelte';
 	import EditPostForm from './EditPostForm.svelte';
+	import { renderMarkdownToSafeHtml } from '$lib/markdown';
+
+	type Photo = { id: string; filename: string; postId: string; excludeFromStream: boolean | null };
+	type Block =
+		| { id: string; type: 'text'; text: string | null; photos: Photo[] }
+		| { id: string; type: 'photos'; text: string | null; photos: Photo[] };
 
 	let {
 		post,
@@ -14,11 +20,10 @@
 		post: {
 			id: string;
 			title: string | null;
-			text: string | null;
 			createdAt: Date | string;
 			isStatusPost: boolean;
 			anchorId?: string | null;
-			photos: { id: string; filename: string; postId: string }[];
+			blocks: Block[];
 			album: {
 				id: string;
 				title: string;
@@ -56,6 +61,28 @@
 	}) {
 		const placeAndCountry = [p.locationPlace, p.locationCountry].filter(Boolean).join(', ');
 		return [p.locationName, placeAndCountry].filter(Boolean).join(' · ');
+	}
+
+	function isExcludedBlock(block: Block) {
+		return block.type === 'photos' && block.photos.length > 0 && block.photos.every((p) => !!p.excludeFromStream);
+	}
+
+	const isOrigin = $derived(post.album != null && post.album.originPostId === post.id);
+	const firstAlbumBlockId = $derived(
+		isOrigin ? post.blocks.find((b) => b.type === 'photos' && !isExcludedBlock(b))?.id ?? null : null
+	);
+
+	function editableBlocks() {
+		return post.blocks.map((b) =>
+			b.type === 'text'
+				? { id: b.id, type: 'text' as const, text: b.text ?? '' }
+				: {
+						id: b.id,
+						type: 'photos' as const,
+						photos: b.photos,
+						excludeFromStream: isExcludedBlock(b)
+					}
+		);
 	}
 </script>
 
@@ -104,7 +131,7 @@
 		<EditPostForm
 			postId={post.id}
 			title={post.title}
-			text={post.text}
+			blocks={editableBlocks()}
 			tags={post.tags.map((t) => t.name)}
 			location={post.latitude != null && post.longitude != null
 				? {
@@ -118,13 +145,19 @@
 			onSaved={() => onEditDone?.()}
 			onCancel={() => onEditDone?.()}
 		/>
-	{:else if post.text}
-		<div class="post-text">{post.text}</div>
+	{:else}
+		{#each post.blocks as block (block.id)}
+			{#if block.type === 'text'}
+				{#if block.text?.trim()}
+					<div class="post-text">{@html renderMarkdownToSafeHtml(block.text)}</div>
+				{/if}
+			{:else if block.id === firstAlbumBlockId}
+				<PhotoGrid photos={post.album?.photos ?? []} />
+			{:else if !(isOrigin && !isExcludedBlock(block))}
+				<PhotoGrid photos={block.photos} />
+			{/if}
+		{/each}
 	{/if}
-
-	<PhotoGrid
-		photos={post.album && post.album.originPostId === post.id ? post.album.photos : post.photos}
-	/>
 </article>
 
 <style>
@@ -173,7 +206,26 @@
 		padding: 12px 16px;
 		font-size: 15px;
 		line-height: 1.35;
-		white-space: pre-wrap;
+	}
+	.post-text :global(p) {
+		margin: 0 0 0.6em 0;
+	}
+	.post-text :global(p:last-child) {
+		margin-bottom: 0;
+	}
+	.post-text :global(ul),
+	.post-text :global(ol) {
+		margin: 0 0 0.6em 1.3em;
+		padding: 0;
+	}
+	.post-text :global(blockquote) {
+		margin: 0 0 0.6em 0;
+		padding-left: 12px;
+		border-left: 3px solid var(--fb-border);
+		color: var(--fb-gray);
+	}
+	.post-text :global(a) {
+		color: var(--fb-blue);
 	}
 	.post-location {
 		margin-top: 4px;

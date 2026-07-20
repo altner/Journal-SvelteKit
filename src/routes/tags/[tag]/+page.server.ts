@@ -19,7 +19,10 @@ export const load: PageServerLoad = async ({ params }) => {
 		where: inArray(post.id, postIds),
 		orderBy: desc(post.createdAt),
 		with: {
-			photos: { orderBy: (photo, { asc }) => asc(photo.position) },
+			blocks: {
+				orderBy: (block, { asc }) => asc(block.position),
+				with: { photos: { orderBy: (photo, { asc }) => asc(photo.position) } }
+			},
 			album: {
 				with: {
 					photos: { orderBy: (photo, { asc }) => asc(photo.position) }

@@ -219,6 +219,12 @@ fires for `success` results, not redirects.
   allgemeinen Plattitüden.
 - Das TodoWrite/Task-Tool ergänzend zur Fortschrittsanzeige innerhalb einer Session nutzen, ersetzt
   aber nicht `tasks/todo.md`.
+- **Deploys macht ausschließlich der Nutzer selbst.** Claude führt `scripts/deploy.sh` nicht aus und
+  stößt auch sonst keinen Rollout auf achis.blog an (Build+Sync, Service-Neustart) — Änderungen
+  lokal fertigstellen/testen und dem Nutzer zum eigenen Deploy übergeben. Direkte Eingriffe auf dem
+  Produktions-Server (z.B. eine DB-Migration nachholen, wie beim Blocks-Feature-Vorfall nötig) sind
+  nur mit expliziter Rückfrage/Zustimmung im jeweiligen Moment vertretbar, nie als Ersatz für einen
+  eigenständigen Deploy durch Claude.
 
 ## Known gaps (see README for full list)
 

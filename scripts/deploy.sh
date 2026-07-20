@@ -21,6 +21,16 @@ rsync -az --delete \
 rsync -az \
   package.json package-lock.json "$REMOTE_HOST:$REMOTE_DIR/"
 
+# drizzle-kit push (below) runs ON the remote host and diffs the live DB against whatever
+# schema.ts/drizzle.config.ts it finds THERE - build/ doesn't contain these (they're TS source,
+# not part of the compiled server bundle), so without this sync step the remote would keep using
+# whatever stale copy was last there and drizzle-kit would propose reverting the DB to match IT
+# (i.e. dropping tables/columns the current schema.ts actually wants) instead of moving forward.
+echo "==> Syncing schema.ts + drizzle.config.ts (needed for the drizzle-kit push step below)..."
+ssh "$REMOTE_HOST" "mkdir -p $REMOTE_DIR/src/lib/server/db"
+rsync -az drizzle.config.ts "$REMOTE_HOST:$REMOTE_DIR/drizzle.config.ts"
+rsync -az src/lib/server/db/schema.ts "$REMOTE_HOST:$REMOTE_DIR/src/lib/server/db/schema.ts"
+
 echo "==> Installing production deps..."
 ssh "$REMOTE_HOST" "cd $REMOTE_DIR && npm ci --omit=dev"
 

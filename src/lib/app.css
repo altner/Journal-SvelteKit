@@ -10,6 +10,10 @@
 	box-sizing: border-box;
 }
 
+.sveltekit-body {
+	display: contents;
+}
+
 body {
 	margin: 0;
 	background: var(--fb-bg);

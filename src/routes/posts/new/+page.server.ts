@@ -2,9 +2,14 @@ import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
 import { album, photo, post } from '$lib/server/db/schema';
-import { saveUploadedPhoto } from '$lib/server/storage';
 import { setPostTags, parseTagsField } from '$lib/server/tags';
-import { eq } from 'drizzle-orm';
+import {
+	parseBlocksMeta,
+	saveNewPostBlocks,
+	blocksMetaHasContent,
+	countNonExcludedNewFiles
+} from '$lib/server/blocks';
+import { eq, inArray } from 'drizzle-orm';
 
 // Nimmt die optionalen "date"/"time"-Felder (YYYY-MM-DD / HH:MM, z.B. für nachträglich
 // hochgeladene ältere Fotos) und kombiniert sie. Ohne gültiges Datum: jetzt. Mit Datum aber ohne
@@ -49,7 +54,6 @@ export const actions: Actions = {
 
 		const data = await request.formData();
 		const title = String(data.get('title') ?? '').trim();
-		const text = String(data.get('text') ?? '').trim();
 		const saveAsAlbum = data.get('saveAsAlbum') === 'on';
 		const albumTitle = String(data.get('albumTitle') ?? '').trim();
 		const createdAt = resolveCreatedAt(
@@ -57,6 +61,7 @@ export const actions: Actions = {
 			String(data.get('time') ?? '').trim()
 		);
 		const rawTags = parseTagsField(data.get('tags'));
+		const blocksMeta = parseBlocksMeta(data.get('blocksMeta'));
 
 		const latitudeRaw = Number(data.get('latitude'));
 		const longitudeRaw = Number(data.get('longitude'));
@@ -68,15 +73,11 @@ export const actions: Actions = {
 		const locationCountry = String(data.get('locationCountry') ?? '').trim();
 		const locationName = String(data.get('locationName') ?? '').trim();
 
-		const files = data
-			.getAll('photos')
-			.filter((f): f is File => f instanceof File && f.size > 0);
-
-		if (!text && files.length === 0) {
+		if (!blocksMetaHasContent(blocksMeta, data)) {
 			return fail(400, { error: 'Bitte gib einen Text ein oder füge mindestens ein Foto hinzu.' });
 		}
 
-		if (saveAsAlbum && files.length < 2) {
+		if (saveAsAlbum && countNonExcludedNewFiles(blocksMeta, data) < 2) {
 			return fail(400, {
 				error: 'Ein Album braucht mindestens zwei Fotos. Lade weitere Fotos hoch oder deaktiviere die Album-Option.'
 			});
@@ -86,7 +87,6 @@ export const actions: Actions = {
 			.insert(post)
 			.values({
 				title: title || null,
-				text: text || null,
 				authorId: user.id,
 				createdAt,
 				latitude: hasLocation ? latitudeRaw : null,
@@ -99,9 +99,9 @@ export const actions: Actions = {
 
 		await setPostTags(createdPost.id, rawTags);
 
-		let albumId: string | null = null;
+		const { nonExcludedPhotoIds } = await saveNewPostBlocks(createdPost.id, blocksMeta, data);
 
-		if (saveAsAlbum && files.length > 0) {
+		if (saveAsAlbum && nonExcludedPhotoIds.length >= 2) {
 			const [createdAlbum] = await db
 				.insert(album)
 				.values({
@@ -111,22 +111,12 @@ export const actions: Actions = {
 					createdAt
 				})
 				.returning();
-			albumId = createdAlbum.id;
 
-			await db.update(post).set({ albumId }).where(eq(post.id, createdPost.id));
-		}
-
-		let position = 0;
-		for (const file of files) {
-			const { filename } = await saveUploadedPhoto(file);
-			await db.insert(photo).values({
-				filename,
-				originalName: file.name,
-				postId: createdPost.id,
-				albumId,
-				position: position++,
-				createdAt
-			});
+			await db.update(post).set({ albumId: createdAlbum.id }).where(eq(post.id, createdPost.id));
+			await db
+				.update(photo)
+				.set({ albumId: createdAlbum.id })
+				.where(inArray(photo.id, nonExcludedPhotoIds));
 		}
 
 		throw redirect(303, '/');

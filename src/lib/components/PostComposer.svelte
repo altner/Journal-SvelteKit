@@ -3,11 +3,13 @@
 	import { tick } from 'svelte';
 	import TagInput from './TagInput.svelte';
 	import LocationPicker from './LocationPicker.svelte';
+	import BlockEditor from './BlockEditor.svelte';
 
-	let fileCount = $state(0);
+	let photoCount = $state(0);
 	let error = $state<string | undefined>();
 	let tagInputRef: ReturnType<typeof TagInput> | undefined = $state();
 	let locationPickerRef: ReturnType<typeof LocationPicker> | undefined = $state();
+	let blockEditorRef: ReturnType<typeof BlockEditor> | undefined = $state();
 
 	function todayLocalDate() {
 		const d = new Date();
@@ -23,11 +25,6 @@
 
 	let dateValue = $state(todayLocalDate());
 	let timeValue = $state(nowLocalTime());
-
-	function onFilesChange(e: Event) {
-		const input = e.currentTarget as HTMLInputElement;
-		fileCount = input.files?.length ?? 0;
-	}
 </script>
 
 <form
@@ -42,9 +39,10 @@
 			} else {
 				error = undefined;
 				formElement.reset();
-				fileCount = 0;
+				photoCount = 0;
 				tagInputRef?.reset();
 				locationPickerRef?.reset();
+				blockEditorRef?.reset();
 				// formElement.reset() clears the date/time inputs' DOM values directly without
 				// Svelte noticing, so re-assigning right away can lose to that reset in the same
 				// tick — wait a tick first so our values win.
@@ -77,10 +75,7 @@
 	</div>
 	<p class="hint">Für ältere Fotos anpassbar — wirkt sich auf Feed-Reihenfolge, Album und Foto-Stream aus.</p>
 
-	<label>
-		Text
-		<textarea name="text" rows="3" placeholder="Was möchtest du teilen?"></textarea>
-	</label>
+	<BlockEditor bind:this={blockEditorRef} onPhotoCountChange={(n) => (photoCount = n)} />
 
 	<label>
 		Tags
@@ -89,22 +84,17 @@
 
 	<LocationPicker bind:this={locationPickerRef} />
 
-	<label>
-		Fotos (optional, mehrere möglich)
-		<input type="file" name="photos" accept="image/*" multiple onchange={onFilesChange} />
-	</label>
-
-	{#if fileCount >= 2}
+	{#if photoCount >= 2}
 		<label class="checkbox-row">
 			<input type="checkbox" name="saveAsAlbum" />
-			Diese {fileCount} Fotos zusätzlich als Album speichern
+			Diese {photoCount} Fotos zusätzlich als Album speichern
 		</label>
 
 		<label>
 			Album-Titel (optional)
 			<input type="text" name="albumTitle" placeholder="z. B. Urlaub 2026" />
 		</label>
-	{:else if fileCount === 1}
+	{:else if photoCount === 1}
 		<p class="hint">Einzelnes Foto — landet im Foto-Stream.</p>
 	{/if}
 
@@ -132,17 +122,13 @@
 	.date-time-row label {
 		flex: 1;
 	}
-	input[type='text'],
-	textarea {
+	input[type='text'] {
 		padding: 10px 12px;
 		border: 1px solid var(--fb-border);
 		border-radius: 6px;
 		font-size: 15px;
 		font-family: inherit;
 		color: #050505;
-	}
-	input[type='file'] {
-		font-size: 14px;
 	}
 	.checkbox-row {
 		flex-direction: row;

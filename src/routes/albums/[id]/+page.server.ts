@@ -1,10 +1,12 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 import { db } from '$lib/server/db';
-import { eq, desc } from 'drizzle-orm';
-import { album, photo, post } from '$lib/server/db/schema';
-import { saveUploadedPhoto, deleteUploadedPhoto } from '$lib/server/storage';
+import { eq, desc, inArray } from 'drizzle-orm';
+import { album, photo, post, postBlock } from '$lib/server/db/schema';
+import { deleteUploadedPhoto } from '$lib/server/storage';
 import { deletePostCascade, isPostNowEmpty } from '$lib/server/posts';
+import { saveNewPostBlocks, pruneEmptyPhotoBlocks, type BlockMeta } from '$lib/server/blocks';
+import { randomUUID } from 'node:crypto';
 
 export const load: PageServerLoad = async ({ params }) => {
 	const found = await db.query.album.findFirst({
@@ -44,7 +46,7 @@ export const actions: Actions = {
 			.where(eq(photo.albumId, found.id))
 			.orderBy(desc(photo.position))
 			.limit(1);
-		let position = (lastPhoto?.position ?? -1) + 1;
+		const startPhotoPosition = (lastPhoto?.position ?? -1) + 1;
 
 		const title =
 			files.length === 1
@@ -55,23 +57,21 @@ export const actions: Actions = {
 			.insert(post)
 			.values({
 				title,
-				text: text || null,
 				authorId: user.id,
 				albumId: found.id,
 				isStatusPost: true
 			})
 			.returning();
 
-		for (const file of files) {
-			const { filename } = await saveUploadedPhoto(file);
-			await db.insert(photo).values({
-				filename,
-				originalName: file.name,
-				postId: createdPost.id,
-				albumId: found.id,
-				position: position++
-			});
-		}
+		const blocksMeta: BlockMeta[] = [];
+		if (text) blocksMeta.push({ id: randomUUID(), type: 'text', text });
+		blocksMeta.push({ id: randomUUID(), type: 'photos', fileField: 'photos', excludeFromStream: false });
+
+		const { nonExcludedPhotoIds } = await saveNewPostBlocks(createdPost.id, blocksMeta, data, {
+			startPhotoPosition
+		});
+
+		await db.update(photo).set({ albumId: found.id }).where(inArray(photo.id, nonExcludedPhotoIds));
 	},
 
 	deletePhoto: async ({ request, params, locals }) => {
@@ -88,14 +88,15 @@ export const actions: Actions = {
 
 		await deleteUploadedPhoto(found.filename);
 		await db.delete(photo).where(eq(photo.id, found.id));
+		await pruneEmptyPhotoBlocks(found.postId);
 
 		const owner = await db.query.post.findFirst({
 			where: eq(post.id, found.postId),
-			with: { photos: true, album: true }
+			with: { blocks: { with: { photos: true } }, album: true }
 		});
 
-		if (owner && isPostNowEmpty(owner, owner.photos.length)) {
-			await deletePostCascade(owner);
+		if (owner && isPostNowEmpty(owner, owner.blocks)) {
+			await deletePostCascade({ id: owner.id, photos: [], album: owner.album });
 		}
 	},
 
@@ -116,13 +117,21 @@ export const actions: Actions = {
 		}
 		await db.delete(photo).where(eq(photo.albumId, found.id));
 
+		const originRef = { id: found.id, originPostId: found.originPostId };
+
 		for (const p of contributingPosts) {
+			await pruneEmptyPhotoBlocks(p.id);
+
 			if (p.isStatusPost) {
-				await db.delete(post).where(eq(post.id, p.id));
+				await deletePostCascade({ id: p.id, photos: [], album: originRef });
 			} else {
 				await db.update(post).set({ albumId: null }).where(eq(post.id, p.id));
-				if (!p.title && !p.text) {
-					await db.delete(post).where(eq(post.id, p.id));
+				const remainingBlocks = await db.query.postBlock.findMany({
+					where: eq(postBlock.postId, p.id),
+					with: { photos: true }
+				});
+				if (isPostNowEmpty(p, remainingBlocks)) {
+					await deletePostCascade({ id: p.id, photos: [], album: originRef });
 				}
 			}
 		}

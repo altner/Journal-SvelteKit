@@ -2,11 +2,12 @@
 	import { enhance } from '$app/forms';
 	import TagInput from './TagInput.svelte';
 	import LocationPicker from './LocationPicker.svelte';
+	import BlockEditor from './BlockEditor.svelte';
 
 	let {
 		postId,
 		title,
-		text,
+		blocks,
 		tags = [],
 		location = null,
 		onSaved,
@@ -14,7 +15,15 @@
 	}: {
 		postId: string;
 		title: string | null;
-		text: string | null;
+		blocks: (
+			| { id: string; type: 'text'; text: string }
+			| {
+					id: string;
+					type: 'photos';
+					photos: { id: string; filename: string }[];
+					excludeFromStream: boolean;
+			  }
+		)[];
 		tags?: string[];
 		location?: {
 			latitude: number;
@@ -33,6 +42,7 @@
 <form
 	method="POST"
 	action="/posts/{postId}?/edit"
+	enctype="multipart/form-data"
 	class="edit-form"
 	use:enhance={() => {
 		return async ({ result, update }) => {
@@ -53,10 +63,7 @@
 		<input type="text" name="title" value={title ?? ''} placeholder="Worum geht's?" />
 	</label>
 
-	<label>
-		Text
-		<textarea name="text" rows="3" placeholder="Was möchtest du teilen?">{text ?? ''}</textarea>
-	</label>
+	<BlockEditor initialBlocks={blocks} />
 
 	<label>
 		Tags
@@ -85,8 +92,7 @@
 		font-size: 13px;
 		color: var(--fb-gray);
 	}
-	input[type='text'],
-	textarea {
+	input[type='text'] {
 		padding: 8px 10px;
 		border: 1px solid var(--fb-border);
 		border-radius: 6px;
