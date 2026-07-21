@@ -69,7 +69,13 @@
 	{/if}
 
 	{#if data.albums.length === 0}
-		<p class="empty">Noch keine Alben. Lade mehrere Fotos in einem Post hoch und aktiviere "als Album speichern".</p>
+		<p class="empty">
+			{#if data.user}
+				Noch keine Alben. Lade mehrere Fotos in einem Post hoch und aktiviere "als Album speichern".
+			{:else}
+				Noch keine Alben.
+			{/if}
+		</p>
 	{/if}
 
 	<JustifiedGallery items={data.albums} targetRowHeight={210} gap={8}>

@@ -15,11 +15,14 @@ cd "$(dirname "$0")/.."
 echo "==> Building..."
 npm run build
 
-echo "==> Syncing build/, package.json, package-lock.json..."
+echo "==> Syncing build/, package files, and maintenance scripts..."
 rsync -az --delete \
   build/ "$REMOTE_HOST:$REMOTE_DIR/build/"
 rsync -az \
   package.json package-lock.json "$REMOTE_HOST:$REMOTE_DIR/"
+ssh "$REMOTE_HOST" "mkdir -p $REMOTE_DIR/scripts"
+rsync -az \
+  scripts/ "$REMOTE_HOST:$REMOTE_DIR/scripts/"
 
 # drizzle-kit push (below) runs ON the remote host and diffs the live DB against whatever
 # schema.ts/drizzle.config.ts it finds THERE - build/ doesn't contain these (they're TS source,

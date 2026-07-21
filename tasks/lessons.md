@@ -54,3 +54,14 @@ Hauptspalte plus rechte Leiste wäre seine optische Mitte gegenüber der gesamte
 - Auf der ersten Seite darf „Ältere“ nur erscheinen, wenn wirklich ein überzähliger Datensatz
   geladen wurde (`hasMore`). Das bloße Fehlen eines Cursors beweist nicht, dass eine Folgeseite
   existiert.
+
+## Wartungsskripte im Deployment
+
+- Wenn ein neues `npm run`-Wartungsskript nach einem Deploy auf dem Server ausgeführt werden soll,
+  muss `scripts/` Teil der Synchronisation sein. Serverkommandos dürfen außerdem nicht zwingend
+  eine `.env` voraussetzen, weil die Produktion ihre Variablen über systemd erhält.
+
+## Leere Zustände
+
+- Handlungsaufforderungen zum Erstellen oder Hochladen nur eingeloggten Nutzern zeigen. Öffentliche
+  leere Übersichten bleiben neutral und beschreiben lediglich, dass noch keine Inhalte vorhanden sind.

@@ -13,8 +13,8 @@
 			class="portrait"
 			src="/me.jpg"
 			alt="Adrian Altner"
-			width="975"
-			height="1300"
+			width="760"
+			height="1013"
 		/>
 
 		<div class="content">

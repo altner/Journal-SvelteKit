@@ -18,7 +18,7 @@
 		"backfill-post-blocks": "node --env-file=.env scripts/backfill-post-blocks.mjs",
 		"backfill-post-slugs": "node --env-file=.env scripts/backfill-post-slugs.mjs",
 		"backfill-album-slugs": "node --env-file=.env scripts/backfill-album-slugs.mjs",
-		"backfill-photo-dimensions": "node --env-file=.env scripts/backfill-photo-dimensions.mjs"
+		"backfill-photo-dimensions": "node --env-file-if-exists=.env scripts/backfill-photo-dimensions.mjs"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-node": "^5.5.4",
