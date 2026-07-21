@@ -2,6 +2,8 @@
 	import type { PageData } from './$types';
 	import PostComposer from '$lib/components/PostComposer.svelte';
 	import PostCard from '$lib/components/PostCard.svelte';
+	import ActivityFeedCard from '$lib/components/ActivityFeedCard.svelte';
+	import Pagination from '$lib/components/Pagination.svelte';
 	let { data }: { data: PageData } = $props();
 
 	let editingId = $state<string | null>(null);
@@ -16,25 +18,37 @@
 		<PostComposer />
 	{/if}
 
-	{#if data.posts.length === 0}
+	{#if data.items.length === 0}
 		<p class="empty">
 			{#if data.user}
-				Noch keine Posts.
+				Noch nichts hier.
 			{:else}
-				Noch keine Posts. <a href="/posts/new">Leg los</a>.
+				Noch nichts hier. <a href="/posts/new">Leg los</a>.
 			{/if}
 		</p>
 	{/if}
 
-	{#each data.posts as p (p.id)}
-		<PostCard
-			post={p}
-			user={data.user}
-			editing={editingId === p.id}
-			onEdit={() => (editingId = p.id)}
-			onEditDone={() => (editingId = null)}
-		/>
+	{#each data.items as item (item.kind === 'post' ? item.post.id : item.activity.id)}
+		{#if item.kind === 'post'}
+			<PostCard
+				post={item.post}
+				user={data.user}
+				editing={editingId === item.post.id}
+				onEdit={() => (editingId = item.post.id)}
+				onEditDone={() => (editingId = null)}
+			/>
+		{:else}
+			<ActivityFeedCard
+				activity={item.activity}
+				user={data.user}
+				editing={editingId === item.activity.id}
+				onEdit={() => (editingId = item.activity.id)}
+				onEditDone={() => (editingId = null)}
+			/>
+		{/if}
 	{/each}
+
+	<Pagination pagination={data.pagination} />
 </div>
 
 <style>

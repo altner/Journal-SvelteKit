@@ -14,15 +14,35 @@ export async function ensureUploadDir() {
 }
 
 // Resizes + re-encodes as WebP in memory; the original upload is never written to disk.
-export async function saveUploadedPhoto(file: File): Promise<{ filename: string }> {
+export async function saveUploadedPhoto(
+	file: File
+): Promise<{ filename: string; width: number; height: number }> {
 	await ensureUploadDir();
 	const filename = `${randomUUID()}.webp`;
 	const original = Buffer.from(await file.arrayBuffer());
-	const buffer = await sharp(original)
+	const { data: buffer, info } = await sharp(original)
 		.rotate() // bake in EXIF orientation before it gets stripped by re-encoding
 		.resize({ width: MAX_WIDTH, withoutEnlargement: true })
 		.webp({ quality: WEBP_QUALITY })
-		.toBuffer();
+		.toBuffer({ resolveWithObject: true });
+	await writeFile(path.join(UPLOAD_DIR, filename), buffer);
+	return { filename, width: info.width, height: info.height };
+}
+
+// Raw file storage for non-image uploads (GPS tracks) — no transcoding, unlike saveUploadedPhoto.
+// Takes the caller's allow-list of extensions (today just ['.gpx']) rather than hardcoding one,
+// so adding FIT support later is a new call-site argument, not a rewrite of this function.
+export async function saveUploadedTrackFile(
+	file: File,
+	allowedExtensions: string[]
+): Promise<{ filename: string }> {
+	const ext = path.extname(file.name).toLowerCase();
+	if (!allowedExtensions.includes(ext)) {
+		throw new Error(`Nicht unterstütztes Dateiformat: ${ext || '(keine Endung)'}`);
+	}
+	await ensureUploadDir();
+	const filename = `${randomUUID()}${ext}`;
+	const buffer = Buffer.from(await file.arrayBuffer());
 	await writeFile(path.join(UPLOAD_DIR, filename), buffer);
 	return { filename };
 }

@@ -3,7 +3,13 @@
 	import { page } from '$app/state';
 	import PhotoLightbox from './PhotoLightbox.svelte';
 
-	type Photo = { id: string; filename: string; postId: string };
+	type Photo = {
+		id: string;
+		filename: string;
+		postId: string;
+		width?: number | null;
+		height?: number | null;
+	};
 	let { photos }: { photos: Photo[] } = $props();
 
 	const shown = $derived(photos.slice(0, 5));
@@ -37,13 +43,6 @@
 		history.back();
 	}
 
-	function onKeydown(e: KeyboardEvent) {
-		if (!activePhoto) return;
-		if (e.key === 'Escape') close();
-		else if (e.key === 'ArrowRight' && photos.length > 1) goToIndex(activeIndex + 1);
-		else if (e.key === 'ArrowLeft' && photos.length > 1) goToIndex(activeIndex - 1);
-	}
-
 	$effect(() => {
 		if (!activePhoto) return;
 		document.body.style.overflow = 'hidden';
@@ -53,10 +52,14 @@
 	});
 </script>
 
-<svelte:window onkeydown={onKeydown} />
-
 {#if photos.length === 1}
-	<a class="single-link" href={hrefFor(photos[0])} onclick={openPhoto(photos[0])}>
+	<a
+		class="single-link"
+		class:portrait={(photos[0].height ?? 0) > (photos[0].width ?? 0)}
+		href={hrefFor(photos[0])}
+		onclick={openPhoto(photos[0])}
+		style:--bleed-image={`url('/uploads/${photos[0].filename}')`}
+	>
 		<img class="single" src="/uploads/{photos[0].filename}" alt="" />
 	</a>
 {:else if photos.length > 1}
@@ -91,18 +94,45 @@
 <style>
 	/* ---------- 1 photo: full width ---------- */
 	.single-link {
+		position: relative;
 		display: block;
 		width: 100%;
+		overflow: hidden;
+		background: #18191a;
 	}
 	.single {
 		width: 100%;
-		max-height: 500px;
-		object-fit: cover;
+		height: auto;
 		display: block;
 	}
-	@media (min-width: 768px) {
-		.single {
-			max-height: 600px;
+	.single-link.portrait {
+		height: min(72vh, 680px);
+		min-height: 360px;
+		display: grid;
+		place-items: center;
+		isolation: isolate;
+	}
+	.single-link.portrait::before {
+		content: '';
+		position: absolute;
+		inset: -28px;
+		background-image: linear-gradient(rgba(0, 0, 0, 0.28), rgba(0, 0, 0, 0.28)), var(--bleed-image);
+		background-position: center;
+		background-size: cover;
+		filter: blur(22px);
+		z-index: -1;
+	}
+	.single-link.portrait .single {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		object-fit: contain;
+	}
+	@media (max-height: 560px) {
+		.single-link.portrait {
+			height: 82vh;
+			min-height: 0;
 		}
 	}
 

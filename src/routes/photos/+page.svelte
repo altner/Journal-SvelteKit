@@ -5,6 +5,8 @@
 	import type { PageData } from './$types';
 	import PhotoTabs from '$lib/components/PhotoTabs.svelte';
 	import PhotoLightbox from '$lib/components/PhotoLightbox.svelte';
+	import JustifiedGallery from '$lib/components/JustifiedGallery.svelte';
+	import Pagination from '$lib/components/Pagination.svelte';
 
 	let { data }: { data: PageData } = $props();
 
@@ -56,13 +58,6 @@
 		goToIndex(deletedIndex);
 	}
 
-	function onKeydown(e: KeyboardEvent) {
-		if (!activePhoto) return;
-		if (e.key === 'Escape') close();
-		else if (e.key === 'ArrowRight' && data.photos.length > 1) goToIndex(activeIndex + 1);
-		else if (e.key === 'ArrowLeft' && data.photos.length > 1) goToIndex(activeIndex - 1);
-	}
-
 	$effect(() => {
 		if (!activePhoto) return;
 		document.body.style.overflow = 'hidden';
@@ -71,8 +66,6 @@
 		};
 	});
 </script>
-
-<svelte:window onkeydown={onKeydown} />
 
 <svelte:head>
 	<title>Fotos · achis.blog</title>
@@ -107,9 +100,9 @@
 				};
 			}}
 		>
-			<div class="grid">
-				{#each data.photos as p (p.id)}
-					{#if p.albumId == null}
+			<JustifiedGallery items={data.photos}>
+				{#snippet children(p)}
+					{#if p.kind === 'post' && p.albumId == null}
 						<label class="tile selectable" class:checked={selectedIds.includes(p.id)}>
 							<input type="checkbox" name="photoIds" value={p.id} bind:group={selectedIds} />
 							<img src="/uploads/{p.filename}" alt={p.originalName ?? ''} loading="lazy" />
@@ -119,8 +112,8 @@
 							<img src="/uploads/{p.filename}" alt={p.originalName ?? ''} loading="lazy" />
 						</div>
 					{/if}
-				{/each}
-			</div>
+				{/snippet}
+			</JustifiedGallery>
 
 			{#if selectedIds.length > 0}
 				<div class="selection-bar">
@@ -132,14 +125,16 @@
 			{/if}
 		</form>
 	{:else}
-		<div class="grid">
-			{#each data.photos as p (p.id)}
+		<JustifiedGallery items={data.photos}>
+			{#snippet children(p)}
 				<a class="tile" href={hrefFor(p.id)} onclick={openPhoto(p.id)}>
 					<img src="/uploads/{p.filename}" alt={p.originalName ?? ''} loading="lazy" />
 				</a>
-			{/each}
-		</div>
+			{/snippet}
+		</JustifiedGallery>
 	{/if}
+
+	<Pagination pagination={data.pagination} />
 </div>
 
 {#if activePhoto}
@@ -157,6 +152,7 @@
 		onNext={data.photos.length > 1 ? () => goToIndex(activeIndex + 1) : undefined}
 		deleteAction={data.user ? '/photos?/deletePhoto' : undefined}
 		onDeleted={handlePhotoDeleted}
+		origins={activePhoto.origins}
 	/>
 {/if}
 
@@ -168,22 +164,14 @@
 	.empty {
 		color: var(--fb-gray);
 	}
-	.grid {
-		display: grid;
-		grid-template-columns: repeat(3, 1fr);
-		gap: 4px;
-	}
-	@media (min-width: 768px) {
-		.grid {
-			grid-template-columns: repeat(4, 1fr);
-		}
-	}
 	.tile {
 		display: block;
+		width: 100%;
+		height: 100%;
 	}
 	.tile img {
 		width: 100%;
-		aspect-ratio: 1 / 1;
+		height: 100%;
 		object-fit: cover;
 		display: block;
 		border-radius: 4px;

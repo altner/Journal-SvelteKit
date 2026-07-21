@@ -39,13 +39,6 @@
 		history.back();
 	}
 
-	function onKeydown(e: KeyboardEvent) {
-		if (!activePhoto) return;
-		if (e.key === 'Escape') close();
-		else if (e.key === 'ArrowRight' && photos.length > 1) goToIndex(activeIndex + 1);
-		else if (e.key === 'ArrowLeft' && photos.length > 1) goToIndex(activeIndex - 1);
-	}
-
 	async function handlePhotoDeleted() {
 		const deletedIndex = activeIndex;
 		await invalidateAll();
@@ -72,8 +65,6 @@
 		fileCount = input.files?.length ?? 0;
 	}
 </script>
-
-<svelte:window onkeydown={onKeydown} />
 
 <svelte:head>
 	<title>{headTitle}</title>

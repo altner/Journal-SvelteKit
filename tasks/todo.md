@@ -1,5 +1,239 @@
 # Todo
 
+## Cursor-Pagination nach Aaron-Parecki-Muster — erledigt
+
+- [x] Gemeinsamen stabilen Cursor aus Datum und ID sowie wiederverwendbare Navigation ergänzt
+- [x] Feed und Beiträge mit „Neuere“/„Ältere“ paginiert
+- [x] Fotos, Alben und Aktivitäten ebenso paginiert; Lightbox bleibt innerhalb der sichtbaren Seite
+- [x] Pro Ansicht werden höchstens 20 Einträge geladen; gemischte Streams werden aus begrenzten
+      Teilabfragen zusammengeführt und stabil nach Datum plus ID sortiert
+- [x] Typprüfung ohne Fehler/Warnungen, Produktions-Build erfolgreich, Diff-Prüfung sauber
+
+## Astro-Lightbox identisch nach Svelte portieren — erledigt
+
+- [x] Native `<dialog>`-Darstellung, SVG-Bedienelemente und Bildgrößen aus dem Paket übernommen;
+      X und Pfeile sind anhand ihrer ViewBox rechnerisch exakt mittig (0 px Abweichung geprüft)
+- [x] 220-ms-Slidewechsel für Buttons und Pfeiltasten portiert, inklusive Decode vor Slide-in
+- [x] Pointer-Swipe mit 6-px-Achsensperre, 60-px-Schwelle und Zurückschnappen portiert
+- [x] Bestehende Deep-Links, Shallow Routing, Löschen und Herkunftsleiste bewahrt; direkte
+      Permalinks behalten echte Anchor-Ziele als Progressive-Enhancement-Fallback
+- [x] Browserprüfung mit 14 Fotos: SVGs vorhanden/zentriert, ArrowRight animiert und aktualisiert
+      URL, horizontaler Swipe wechselt genau ein Foto, Escape schließt nach `/photos`, Body-Scroll
+      wird entsperrt, keine Browserfehler/-warnungen
+- [x] `npm run check` ohne Fehler/Warnungen, Produktions-Build erfolgreich
+
+## Justified Gallery für Fotos und Alben — erledigt
+
+- [x] Framework-unabhängigen `computeLayout()`-Kern aus
+      `@altner/astro-justified-gallery-layout` direkt in Svelte verwenden
+- [x] Bildbreite/-höhe bei neuen Post- und Aktivitätsfotos speichern; bestehende 14 lokale Bilder
+      mit dem idempotenten `backfill-photo-dimensions`-Skript sicher ergänzt
+- [x] Gemeinsame responsive Svelte-Komponente mit `ResizeObserver` und unverändertem
+      Shallow-Routing/Lightbox-Verhalten bauen
+- [x] `/photos` auf justified Zeilen umgestellt, Auswahlmodus weiterhin korrekt unterstützt
+- [x] `/albums` mit den jeweiligen Cover-Seitenverhältnissen ebenfalls justified dargestellt;
+      Albumtitel als gut lesbares Verlaufs-Overlay auf dem Cover
+- [x] `npm run check` ohne Fehler/Warnungen; lokales `/photos` mit 14 Bildern geprüft: drei exakt
+      gefüllte 205×154-Zellen pro 624-px-Zeile, korrekte 4-px-Abstände, kein horizontaler Overflow
+- [ ] Nicht deployed — Produktion braucht vier nullable Spalten (`photo.width/height`,
+      `activity_photo.width/height`) und anschließend `npm run backfill-photo-dimensions`
+
+## Fotos bei Aktivitäten — erledigt
+
+- [x] Globale Foto-Lightbox zeigt eine kompakte Herkunftsleiste unter dem Bild: anklickbare Links
+      zu Beitrag und ggf. Album beziehungsweise zur Aktivität; direkter `/photos/[photoId]`-Aufruf
+      rendert dieselben Informationen wie die Shallow-Routing-Ansicht
+- [x] Nutzerkorrektur: Aktivitätsfotos in den globalen `/photos`-Stream aufgenommen, inklusive
+      chronologischer Sortierung, globalem Foto-Permalink und Löschen; bei „Album erstellen“ sind
+      sie sichtbar, aber bewusst nicht auswählbar
+- [x] Nutzerkorrektur: Streckenkarte steht in Aktivitätskarte und Detailseite oberhalb der Fotos;
+      Foto-Lightbox auf `z-index: 2000` angehoben, damit Leaflet-Panes/-Controls sie nicht überlagern
+- [x] Eigene `activity_photo`-Tabelle samt Relationen ergänzt, da bestehende `photo`-Zeilen
+      zwingend einen Post benötigen
+- [x] Mehrfach-Fotoauswahl beim Aktivitäts-Upload sowie nachträglich über „Bearbeiten“ ergänzt;
+      gespeicherte Dateien werden bei einem fehlgeschlagenen Vorgang wieder entfernt
+- [x] Aktivitätsfotos in Feed, Aktivitätenliste, Tag-Feed und Detailseite angezeigt
+- [x] Aktivitätsbezogene Foto-Permalinks mit eigener Lightbox-Navigation (Shallow Routing sowie
+      funktionierender Direktlink ohne JS) ergänzt
+- [x] Beim Löschen einer Aktivität Fotozeilen und Dateien explizit mit entfernen; zusätzlich auch
+      `activity_tag` explizit bereinigt, da Foreign Keys zur Laufzeit nicht aktiv sind
+- [x] Lokale additive `activity_photo`-Tabelle direkt per SQLite angelegt (keine bestehenden Daten
+      geändert); `npm run check` 0 Fehler/0 Warnungen, Produktions-Build erfolgreich,
+      `git diff --check` sauber
+- [ ] Nicht deployed — Produktion braucht vor dem Nutzer-Deploy dieselbe additive
+      `CREATE TABLE activity_photo`-Migration; Deployment bleibt beim Nutzer
+
+## Aktivitäten: Karte in der Liste, Tags, Bearbeiten — erledigt
+
+Drei Lücken vom Nutzer benannt: Karte fehlte in der `/activities`-Liste (nur im Feed sichtbar),
+keine Tags für Aktivitäten, kein Bearbeiten.
+
+- [x] `/activities`-Liste zeigt jetzt dieselbe `ActivityFeedCard`-Komponente wie der Feed (inkl.
+      Karte) statt einer eigenen schlichten Tile-Darstellung — `load` parst dafür jetzt auch
+      `trackPoints`
+- [x] Neue `activity_tag`-Junction-Tabelle (spiegelt `post_tag` exakt, eigene Tabelle pro Entität
+      statt polymorph, wie schon beim restlichen Schema üblich). Per `sqlite3` als `CREATE TABLE`
+      angelegt (neue, leere Tabelle, kein Risiko)
+- [x] `src/lib/server/tags.ts`: neue `setActivityTags()` — nutzt das bereits vorhandene
+      `resolveOrCreateTags()` mit, identisches Delete-dann-Reinsert-Schema wie `setPostTags()`
+- [x] Tags jetzt Teil des Upload-Formulars (`TagInput`-Komponente wiederverwendet) und im
+      Bearbeiten-Formular
+- [x] `edit`-Action ergänzt (`activities/[slug]/+page.server.ts`) — Titel/Sportart/Tags änderbar,
+      **Slug bleibt bewusst unangetastet** (gleiche Unveränderlichkeits-Regel wie bei
+      `post.slug`/`album.slug` — bestehende Links brechen nicht, wenn der Titel sich ändert). Bei
+      leerem Titel greift derselbe Fallback wie bei der Erstellung
+      (`buildFallbackTitle(sport, startedAt)`)
+- [x] `src/lib/components/EditActivityForm.svelte` neu (Titel/Sportart-Select/Tags, spiegelt
+      `EditPostForm.svelte`s Formular-Grundgerüst, aber ohne Blocks/Standort)
+- [x] `ActivityFeedCard.svelte` bekommt `editing`/`onEdit`/`onEditDone`-Props (identisches Muster zu
+      `PostCard`) — Bearbeiten funktioniert jetzt sowohl auf der Detailseite als auch inline im
+      Feed und in der `/activities`-Liste
+- [x] `/tags/[tag]` zeigt jetzt Posts UND Aktivitäten gemeinsam (gleiches
+      Merge-nach-Zeitstempel-Prinzip wie der Haupt-Feed) — ohne das wäre Tagging von Aktivitäten
+      nutzlos gewesen, da sie nirgends auffindbar wären
+- [x] `/tags`-Übersicht zählt jetzt Post- UND Aktivitäts-Verknüpfungen zusammen (zwei getrennte
+      gruppierte Queries statt einem Join über beide Junction-Tabellen — ein einzelner Join hätte
+      bei Tags mit sowohl Post- als auch Aktivitäts-Verknüpfungen zu falschen counts durch
+      Zeilen-Multiplikation geführt)
+- [x] **Bug beim eigenen Testen gefunden + gefixt:** `/tags/[tag]/+page.server.ts`s
+      Merge-und-Sortier-Kette hatte ein `.sort().map()` verkettet, wobei der finale `.map()`-Schritt
+      das `sortDate`-Feld nicht mehr durchreichte, aber der TS-Typ es weiterhin verlangte —
+      `npm run check` hat das sofort als Typfehler aufgedeckt (kein Laufzeit-Bug, da nie deployt/
+      getestet), behoben durch Trennung in einen `merged`-Zwischenschritt (mit `sortDate`, fürs
+      Sortieren) und einen separaten finalen `items`-Map-Schritt (ohne `sortDate`, fürs Rendering)
+- [x] `npm run check` — 0 Fehler
+- [x] Im Browser + `curl` mit temporärem QA-User (danach gelöscht) end-to-end getestet: Upload mit
+      Tags → Tags korrekt verknüpft; `/activities`-Liste zeigt Karte + Tag-Pills; `/tags/laufen`
+      zeigt die Aktivität; `/tags`-Übersicht zählt korrekt; Bearbeiten (Titel/Sportart/Tags
+      geändert) → Slug bleibt exakt gleich, Änderungen sofort im Feed UND auf der Detailseite
+      sichtbar; Löschen entfernt Aktivität, Verknüpfungen UND Datei; Tags ohne verbleibende
+      Verknüpfung verschwinden korrekt aus der Übersicht (Zeile bleibt aber erhalten, wie bei
+      Post-Tags auch). Test-Daten/-User danach vollständig entfernt
+- [ ] Nicht deployed — Produktions-DB braucht die zusätzliche `CREATE TABLE activity_tag`-Migration
+      (rein additiv, kein Risiko) vor dem nächsten Deploy
+
+## "Alben" aus der Navigation entfernt — erledigt
+
+Auf Wunsch: `src/routes/+layout.svelte`s `navItems` ohne `/albums`-Eintrag — Alben bleiben über den
+"Alben"-Tab auf `/photos` (`PhotoTabs.svelte`) erreichbar, unverändert. Mobile-Exclude-Filter
+entsprechend bereinigt (nur noch `/activities` ausgeschlossen). `npm run check` 0 Fehler, im
+Browser verifiziert: Nav zeigt Feed/Beiträge/Fotos/Aktivitäten/Tags, `/photos`s Alben-Tab
+funktioniert weiterhin.
+
+## `/posts`-Archivseite für Beiträge — erledigt
+
+Nutzer-Feedback: `/` (Feed) ist ein Fetch-all (Posts + Aktivitäten gemischt), aber Posts hatten
+anders als Fotos/Alben/Aktivitäten/Tags keine eigene reine Übersichtsseite.
+
+- [x] `src/routes/posts/+page.server.ts` neu — identische Post-Query wie der Feed (inkl.
+      Status-Posts, gleiche Behandlung wie im Feed), aber ohne Aktivitäten/Clustering
+- [x] `src/routes/posts/+page.svelte` neu — gleiche `PostCard`-Liste wie der Feed, ohne
+      `PostComposer`. Kein Routing-Konflikt mit `posts/new` (statisch, Vorrang) oder `posts/[slug]`
+      (dynamisch, matcht nicht den leeren Pfad)
+- [x] Nav-Eintrag "Beiträge" ergänzt (zwischen Feed und Fotos, auch auf Mobile sichtbar — anders
+      als Alben/Aktivitäten, die dort aus Platzgründen ausgeblendet bleiben)
+- [x] `npm run check` — 0 Fehler; im Browser verifiziert (`/posts` zeigt bestehenden Post korrekt,
+      Nav-Highlight aktiv)
+
+## Activity-Feature: GPS-Läufe/Fahrten per GPX-Upload — erledigt
+
+Ausgangspunkt: Frage nach aaronparecki.com's Seitenorganisation (Content-Typ-Archive, Tags,
+Permalinks) → Wunsch, seine Checkins/Rides nachzubilden. Checkins sind mit den bestehenden
+Post-Standortfeldern schon abgedeckt (kein Extra-Modell). Für Rides fehlte echtes GPS-Tracking.
+Nutzerentscheidungen: manueller GPX/FIT-Upload (kein Strava-API-Sync), explizit nicht nur Rides
+sondern allgemein Aktivitäten (Laufen eingeschlossen). Umfang dieser Umsetzung: **nur GPX** (FIT
+bewusst zurückgestellt, Architektur aber so angelegt, dass es später eine kleine Ergänzung wird).
+Plan mit Nutzer abgestimmt (Details: `/Users/adrian/.claude/plans/k-nnen-wir-den-posts-polished-sprout.md`).
+
+- [x] Neue `activity`-Tabelle (`src/lib/server/db/schema.ts`) — folgt post/album-Konventionen
+      (UUID-IDs, nullable-unique `slug`). Da komplett neue/leere Tabelle (kein `ALTER TABLE` auf
+      bestehende Zeilen), sind `title`/`distanceMeters`/`durationSeconds`/`startedAt`/`filename`/
+      `trackPoints` ganz regulär `NOT NULL` — die "nullable wegen db:push-Gefahr"-Regel aus
+      CLAUDE.md gilt nur für `slug` (SQLite erlaubt mehrere NULLs unter UNIQUE-Index), nicht
+      pauschal für jede Spalte. `elevationGainMeters` bleibt nullable (echtes "unbekannt", wenn
+      auch nur ein Trackpunkt kein `<ele>` hat). Per `sqlite3` direkt als `CREATE TABLE` angelegt
+      (kein Backfill-Skript nötig, anders als bei `post.slug`/`album.slug`).
+- [x] `src/lib/server/gpx.ts` neu: `parseGpxTrack()` mit `fast-xml-parser` (bewusst **nicht** das
+      npm-Paket `gpxparser`, das `jsdom` als Abhängigkeit zieht) — Haversine-Distanz, Höhengewinn
+      als Summe der positiven Deltas (NULL bei auch nur einer Datenlücke, kein Teil-Summen-
+      Fallback), Dauer als Elapsed Time über alle `<trk>`/`<trkseg>` hinweg zusammengefasst
+      (schließt Auto-Pause-Lücken ein). Volle Auflösung wird zurückgegeben — Downsampling passiert
+      bewusst getrennt in `activities.ts`, damit die Statistik-Berechnung nie versehentlich auf
+      die downgesampelte Kartendarstellung zugreifen kann.
+- [x] `src/lib/server/activities.ts` neu: `generateActivitySlug`/`findActivityBySlugOrId`
+      (identisch zu `generatePostSlug`/`generateAlbumSlug`), `normalizeSport()`-Whitelist (Drizzles
+      `{enum:[...]}` ist nur TypeScript-seitig, kein SQL-`CHECK` — eine rohe Formular-Eingabe muss
+      serverseitig geprüft werden), `buildFallbackTitle()`, `downsampleTrack()`.
+- [x] `src/lib/server/storage.ts`: neue `saveUploadedTrackFile(file, allowedExtensions)` — bewusst
+      mit Endungs-Parameter statt hartkodiertem `.gpx`, damit späterer FIT-Support ein
+      zusätzlicher Aufruf wird, kein Rewrite. Schreibt Rohbytes ohne Transcoding (anders als Fotos).
+- [x] Route `activities` + `activities/[slug]` neu, spiegelt `albums`/`albums/[slug]`: `load`
+      löst per `findActivityBySlugOrId` auf + `redirect(301,...)` bei Alt-Link über die rohe ID;
+      `upload`-Action mit eigenem `if (!locals.user)`-Check **innerhalb** der Action (nicht über
+      `hooks.server.ts`, gleiche Begründung wie bei `/albums`); `delete`-Action ohne
+      Kaskaden-Komplexität (Aktivitäten besitzen keine Posts/Fotos/Tags).
+- [x] `src/lib/components/TrackMap.svelte` neu: Read-only Leaflet-Karte, kopiert
+      `LocationPicker.svelte`s SSR-sicheres Muster (dynamisches `import('leaflet')` in `onMount`,
+      gleicher Marker-Icon-Fix), zeichnet Polyline + Start/Ziel-Marker + `fitBounds` statt eines
+      ziehbaren Markers. CSP erlaubte `tile.openstreetmap.org` bereits (für `LocationPicker`),
+      keine Änderung nötig.
+- [x] Canonical-Link/`og:title`/`og:description` auf der Detailseite (kein `og:image` — Aktivitäten
+      haben kein Foto, gleiches Vorbild wie bei Alben ohne Titelbild), `src/lib/activityFormat.ts`
+      neu für die geteilten Format-Helper (Karte + Detailseite).
+- [x] Nav-Eintrag "Aktivitäten" ergänzt (aus der mobilen Topnav ausgeschlossen, wie "Alben").
+- [x] `fast-xml-parser` als neue Abhängigkeit — geprüft, dass keine der 7 vorbestehenden
+      `npm audit`-Findings davon kommt (alle bereits vor dieser Session bekannt: SvelteKit/cookie,
+      esbuild/drizzle-kit).
+- [x] **Bug beim eigenen Testen gefunden + gefixt:** `buildFallbackTitle()` nutzte
+      `toLocaleDateString('de-DE')` ohne explizite Formatoptionen — Node füllt den Monat dabei
+      nicht mit führender Null auf ("Lauf am 21.7.2026" statt "21.07.2026", inkonsistent zum Rest
+      der App). Mit `{day:'2-digit', month:'2-digit', year:'numeric'}` behoben, wie
+      `PostCard.svelte`s `formatDate` es bereits macht.
+- [x] `npm run check` — 0 Fehler
+- [x] Parsing-Logik isoliert unit-getestet (Node-Skript außerhalb der App, drei synthetische
+      GPX-Fixtures mit von Hand nachgerechneten Werten): Normalfall (Distanz ≈1667,9 m, Dauer
+      900 s, Höhengewinn 25 m **nicht** 15 m netto, Sport "running" korrekt erkannt), Datei ganz
+      ohne Zeitstempel (Dauer/Start korrekt `null`), Datei mit `<ele>` auf nur 3 von 4 Punkten
+      (Höhengewinn korrekt `null`, keine Teil-Summe)
+- [x] Im Browser + `curl` (Datei-Uploads lassen sich über das Browser-Automatisierungstool nicht
+      simulieren) mit temporärem QA-User (danach gelöscht) end-to-end getestet: Upload der
+      Normalfall-Datei → Karte/Liste zeigen korrekte Werte, Route zeichnet sichtbar eine Linie
+      (SVG-Pfad + 2 Marker im DOM bestätigt), Canonical/OG-Metadaten korrekt, `og:image` komplett
+      abwesend; alter roher-ID-Link redirectet mit 301; `/uploads/{filename}` liefert die rohen
+      GPX-Bytes mit `Content-Type: application/gpx+xml`; ausgeloggter Upload-Versuch → 401; Datei
+      ohne Zeitstempel → 400 mit der erwarteten Fehlermeldung; Datei mit Höhen-Datenlücke → Zeile
+      korrekt mit `elevation_gain_meters = NULL`, Detailseite blendet "Höhengewinn"-Stat sauber aus;
+      Löschen entfernt DB-Zeile UND Datei von der Platte (per UI-Button, `afterDelete`-Navigation
+      zurück zu `/activities` bestätigt). Alle Test-Aktivitäten/-Dateien/-User danach vollständig
+      entfernt (lokale DB im Ausgangszustand)
+- [x] **Nachtrag auf Nutzer-Feedback:** live angelegte Aktivität tauchte nicht im Feed auf, nur
+      unter `/activities` — war zunächst bewusst getrennt wie `/photos`/`/albums`, aber eigentlicher
+      Auslöser des ganzen Features war ja aaronparecki.com's EINEM gemeinsamen Feed. Per Rückfrage
+      bestätigt: Aktivitäten sollen zusätzlich als Karte im Haupt-Feed erscheinen.
+      - `src/routes/+page.server.ts`: lädt jetzt zusätzlich `activity`, merged Posts+Aktivitäten zu
+        einer nach "wann ist das passiert" sortierten Liste (`post.createdAt` bzw.
+        `activity.startedAt`), Clustering (`clusterPostsByMonth`) läuft über die gemergte Liste —
+        die Funktion war durch ihre generische `{id, createdAt}`-Signatur bereits dafür geeignet,
+        keine Änderung an `timeline.ts` nötig
+      - `src/lib/components/ActivityFeedCard.svelte` neu — kompakte Feed-Variante der
+        Aktivitäts-Detailseite (Titel als Permalink statt Datum, wie bei `PostCard` diese Session
+        schon umgestellt), inklusive eingebetteter `TrackMap` und Lösch-Button (ohne
+        `afterDelete`-Prop im Feed-Kontext → fällt auf `update()` zurück, exakt wie `PostCard`s
+        eigenes Verhalten im Feed)
+      - `src/routes/+page.svelte`: rendert `PostCard` oder `ActivityFeedCard` je nach `item.kind`
+      - Timeline-Sidebar (`PostTimeline.svelte`) brauchte keine Änderung — arbeitet bereits rein
+        über generische Anchor-ID-Strings, kennt den Unterschied Post/Aktivität gar nicht
+      - `npm run check` — 0 Fehler; im Browser mit temporärem QA-User verifiziert: Aktivität
+        erscheint chronologisch korrekt einsortiert im Feed (vor einem älteren Test-Post),
+        Zeitleisten-Zähler aktualisiert sich korrekt, Karte rendert inline, Löschen aus dem
+        Feed-Kontext aktualisiert die Liste in-place ohne Navigation. Test-Daten/-User danach
+        entfernt
+- [ ] Nicht deployed — Produktions-DB braucht dieselbe `CREATE TABLE activity`-Migration (rein
+      additiv, kein Risiko) vor dem nächsten Deploy
+- [ ] FIT-Support bewusst zurückgestellt — Architektur ist darauf vorbereitet (Endungs-Parameter
+      in `saveUploadedTrackFile`, Dateiendung statt eigener `sourceFormat`-Spalte steuert Format-
+      Dispatch), aber noch nicht umgesetzt
+
 ## Kanonische URLs + SEO-Metadaten für Alben & Einzelfotos — erledigt
 
 Direkte Fortsetzung des Posts-Features (siehe unten). Nutzerentscheidung per Rückfrage: Alben

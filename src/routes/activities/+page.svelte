@@ -1,40 +1,41 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import type { PageData } from './$types';
-	import PhotoTabs from '$lib/components/PhotoTabs.svelte';
-	import JustifiedGallery from '$lib/components/JustifiedGallery.svelte';
+	import ActivityFeedCard from '$lib/components/ActivityFeedCard.svelte';
+	import TagInput from '$lib/components/TagInput.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
+
 	let { data }: { data: PageData } = $props();
 
 	let creating = $state(false);
 	let error = $state<string | undefined>();
-	let fileCount = $state(0);
+	let hasFile = $state(false);
+	let editingId = $state<string | null>(null);
 
-	function onFilesChange(e: Event) {
+	function onFileChange(e: Event) {
 		const input = e.currentTarget as HTMLInputElement;
-		fileCount = input.files?.length ?? 0;
+		hasFile = (input.files?.length ?? 0) > 0;
 	}
 </script>
 
 <svelte:head>
-	<title>Alben · achis.blog</title>
+	<title>Aktivitäten · achis.blog</title>
 </svelte:head>
 
 <div class="page">
-	<h1>Alben</h1>
-	<PhotoTabs />
+	<h1>Aktivitäten</h1>
 
 	{#if data.user}
 		<button type="button" class="toggle-create" onclick={() => (creating = !creating)}>
-			{creating ? 'Abbrechen' : '+ Neues Album'}
+			{creating ? 'Abbrechen' : '+ Neue Aktivität'}
 		</button>
 
 		{#if creating}
 			<form
 				method="POST"
-				action="?/createAlbum"
+				action="?/upload"
 				enctype="multipart/form-data"
-				class="card create-album-form"
+				class="card upload-form"
 				use:enhance={() => {
 					return async ({ result, update, formElement }) => {
 						if (result.type === 'failure') {
@@ -42,7 +43,7 @@
 						} else {
 							error = undefined;
 							formElement.reset();
-							fileCount = 0;
+							hasFile = false;
 							creating = false;
 						}
 						await update();
@@ -54,36 +55,57 @@
 				{/if}
 
 				<label>
-					Album-Titel (optional)
-					<input type="text" name="albumTitle" placeholder="z. B. Urlaub 2026" />
+					GPX-Datei
+					<input type="file" name="trackFile" accept=".gpx" onchange={onFileChange} />
 				</label>
 
 				<label>
-					Fotos (mindestens 2)
-					<input type="file" name="photos" accept="image/*" multiple onchange={onFilesChange} />
+					Fotos (optional)
+					<input type="file" name="photos" accept="image/*" multiple />
 				</label>
 
-				<button type="submit" disabled={fileCount < 2}>Album erstellen</button>
+				<label>
+					Titel (optional)
+					<input type="text" name="title" placeholder="z. B. Morgenlauf" />
+				</label>
+
+				<label>
+					Sportart
+					<select name="sport">
+						<option value="">automatisch erkennen</option>
+						<option value="running">Laufen</option>
+						<option value="cycling">Radfahren</option>
+						<option value="hiking">Wandern</option>
+						<option value="walking">Spazieren</option>
+						<option value="other">Sonstiges</option>
+					</select>
+				</label>
+
+				<label>
+					Tags
+					<TagInput name="tags" />
+				</label>
+
+				<button type="submit" disabled={!hasFile}>Aktivität hochladen</button>
 			</form>
 		{/if}
 	{/if}
 
-	{#if data.albums.length === 0}
-		<p class="empty">Noch keine Alben. Lade mehrere Fotos in einem Post hoch und aktiviere "als Album speichern".</p>
+	{#if data.activities.length === 0}
+		<p class="empty">Noch keine Aktivitäten.</p>
 	{/if}
 
-	<JustifiedGallery items={data.albums} targetRowHeight={210} gap={8}>
-		{#snippet children(a)}
-			<a class="card tile" href="/albums/{a.slug ?? a.id}">
-				{#if a.photos[0]}
-					<img src="/uploads/{a.photos[0].filename}" alt="" />
-				{:else}
-					<div class="placeholder">📁</div>
-				{/if}
-				<div class="tile-title">{a.title}</div>
-			</a>
-		{/snippet}
-	</JustifiedGallery>
+	<div class="list">
+		{#each data.activities as a (a.id)}
+			<ActivityFeedCard
+				activity={a}
+				user={data.user}
+				editing={editingId === a.id}
+				onEdit={() => (editingId = a.id)}
+				onEditDone={() => (editingId = null)}
+			/>
+		{/each}
+	</div>
 
 	<Pagination pagination={data.pagination} />
 </div>
@@ -110,21 +132,22 @@
 	.toggle-create:hover {
 		background: var(--fb-hover);
 	}
-	.create-album-form {
+	.upload-form {
 		padding: 20px;
 		margin-bottom: 16px;
 		display: flex;
 		flex-direction: column;
 		gap: 12px;
 	}
-	.create-album-form label {
+	.upload-form label {
 		display: flex;
 		flex-direction: column;
 		gap: 4px;
 		font-size: 13px;
 		color: var(--fb-gray);
 	}
-	.create-album-form input[type='text'] {
+	.upload-form input[type='text'],
+	.upload-form select {
 		padding: 10px 12px;
 		border: 1px solid var(--fb-border);
 		border-radius: 6px;
@@ -132,10 +155,10 @@
 		font-family: inherit;
 		color: #050505;
 	}
-	.create-album-form input[type='file'] {
+	.upload-form input[type='file'] {
 		font-size: 14px;
 	}
-	.create-album-form button[type='submit'] {
+	.upload-form button[type='submit'] {
 		margin-top: 4px;
 		background: var(--fb-blue);
 		color: #fff;
@@ -146,14 +169,14 @@
 		font-weight: 600;
 		cursor: pointer;
 	}
-	.create-album-form button[type='submit']:hover {
+	.upload-form button[type='submit']:hover {
 		background: #166fe0;
 	}
-	.create-album-form button[type='submit']:disabled {
+	.upload-form button[type='submit']:disabled {
 		background: var(--fb-border);
 		cursor: not-allowed;
 	}
-	.create-album-form .error {
+	.upload-form .error {
 		background: #fde2e1;
 		color: #b3261e;
 		padding: 8px 10px;
@@ -161,36 +184,9 @@
 		font-size: 13px;
 		margin: 0;
 	}
-	.tile {
-		position: relative;
-		display: block;
-		width: 100%;
-		height: 100%;
-		overflow: hidden;
-	}
-	.tile img,
-	.placeholder {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-		display: block;
-		background: var(--fb-hover);
-	}
-	.placeholder {
+	.list {
 		display: flex;
-		align-items: center;
-		justify-content: center;
-		font-size: 28px;
-	}
-	.tile-title {
-		position: absolute;
-		left: 0;
-		right: 0;
-		bottom: 0;
-		padding: 24px 10px 9px;
-		background: linear-gradient(transparent, rgba(0, 0, 0, 0.75));
-		color: #fff;
-		font-size: 14px;
-		font-weight: 600;
+		flex-direction: column;
+		gap: 16px;
 	}
 </style>

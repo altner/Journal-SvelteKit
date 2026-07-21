@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import type { PageServerData } from './$types';
 	import PhotoLightbox from '$lib/components/PhotoLightbox.svelte';
 
@@ -13,16 +12,7 @@
 		return `/posts/${data.post.slug}/photo/${photos[i].id}`;
 	}
 
-	function onKeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape') goto(`/posts/${data.post.slug}`);
-		else if (e.key === 'ArrowRight' && photos.length > 1)
-			goto(hrefFor((data.index + 1) % photos.length));
-		else if (e.key === 'ArrowLeft' && photos.length > 1)
-			goto(hrefFor((data.index - 1 + photos.length) % photos.length));
-	}
 </script>
-
-<svelte:window onkeydown={onKeydown} />
 
 <svelte:head>
 	<title>{headTitle}</title>

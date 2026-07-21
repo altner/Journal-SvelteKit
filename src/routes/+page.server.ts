@@ -1,12 +1,29 @@
 import type { PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
-import { desc } from 'drizzle-orm';
-import { post } from '$lib/server/db/schema';
+import { and, asc, desc, eq, gt, lt, or } from 'drizzle-orm';
+import { post, activity } from '$lib/server/db/schema';
 import { clusterPostsByMonth } from '$lib/timeline';
+import { finishPage, PAGE_SIZE, readPageCursor } from '$lib/server/pagination';
 
-export const load: PageServerLoad = async () => {
+export const load: PageServerLoad = async ({ url }) => {
+	const cursor = readPageCursor(url);
+	const postWhere = cursor
+		? cursor.direction === 'before'
+			? or(lt(post.createdAt, cursor.date), and(eq(post.createdAt, cursor.date), lt(post.id, cursor.id)))
+			: or(gt(post.createdAt, cursor.date), and(eq(post.createdAt, cursor.date), gt(post.id, cursor.id)))
+		: undefined;
+	const activityWhere = cursor
+		? cursor.direction === 'before'
+			? or(lt(activity.startedAt, cursor.date), and(eq(activity.startedAt, cursor.date), lt(activity.id, cursor.id)))
+			: or(gt(activity.startedAt, cursor.date), and(eq(activity.startedAt, cursor.date), gt(activity.id, cursor.id)))
+		: undefined;
+	const ascending = cursor?.direction === 'after';
 	const posts = await db.query.post.findMany({
-		orderBy: desc(post.createdAt),
+		where: postWhere,
+		orderBy: ascending
+			? [asc(post.createdAt), asc(post.id)]
+			: [desc(post.createdAt), desc(post.id)],
+		limit: PAGE_SIZE + 1,
 		with: {
 			blocks: {
 				orderBy: (block, { asc }) => asc(block.position),
@@ -21,12 +38,63 @@ export const load: PageServerLoad = async () => {
 		}
 	});
 
-	const { groups, anchorIdByPostId } = clusterPostsByMonth(posts);
-	const postsWithAnchors = posts.map((p) => ({
-		...p,
-		anchorId: anchorIdByPostId.get(p.id) ?? null,
-		tags: p.tags.map((pt) => pt.tag)
-	}));
+	const activities = await db.query.activity.findMany({
+		where: activityWhere,
+		orderBy: ascending
+			? [asc(activity.startedAt), asc(activity.id)]
+			: [desc(activity.startedAt), desc(activity.id)],
+		limit: PAGE_SIZE + 1,
+		with: {
+			tags: { with: { tag: true } },
+			photos: { orderBy: (photo, { asc }) => asc(photo.position) }
+		}
+	});
 
-	return { posts: postsWithAnchors, clusters: groups };
+	// Posts and activities are two separate tables — merge them into one chronological stream
+	// (sorted by the "when did this happen" timestamp: post.createdAt / activity.startedAt) so
+	// the feed reads as a single unified timeline, matching how the site's clustering/timeline
+	// sidebar already expects one linear, pre-sorted sequence.
+	type FeedItem =
+		| { kind: 'post'; id: string; sortDate: Date; post: (typeof posts)[number] }
+		| { kind: 'activity'; id: string; sortDate: Date; activity: (typeof activities)[number] };
+
+	const merged: FeedItem[] = [
+		...posts.map((p): FeedItem => ({ kind: 'post', id: p.id, sortDate: p.createdAt, post: p })),
+		...activities.map(
+			(a): FeedItem => ({ kind: 'activity', id: a.id, sortDate: a.startedAt, activity: a })
+		)
+	].sort((a, b) => {
+		const dateDifference = ascending
+			? a.sortDate.getTime() - b.sortDate.getTime()
+			: b.sortDate.getTime() - a.sortDate.getTime();
+		if (dateDifference !== 0) return dateDifference;
+		return ascending ? a.id.localeCompare(b.id) : b.id.localeCompare(a.id);
+	});
+
+	const page = finishPage(merged, cursor?.direction ?? null);
+
+	const { groups, anchorIdByPostId } = clusterPostsByMonth(
+		page.items.map((item) => ({ id: item.id, createdAt: item.sortDate }))
+	);
+
+	const items = page.items.map((item) => {
+		const anchorId = anchorIdByPostId.get(item.id) ?? null;
+		if (item.kind === 'post') {
+			return {
+				kind: 'post' as const,
+				post: { ...item.post, anchorId, tags: item.post.tags.map((pt) => pt.tag) }
+			};
+		}
+		return {
+			kind: 'activity' as const,
+			activity: {
+				...item.activity,
+				anchorId,
+				tags: item.activity.tags.map((at) => at.tag),
+				trackPoints: JSON.parse(item.activity.trackPoints) as [number, number][]
+			}
+		};
+	});
+
+	return { items, clusters: groups, pagination: page.pagination };
 };

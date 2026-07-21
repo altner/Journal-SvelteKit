@@ -17,7 +17,8 @@
 		"create-user": "node --env-file=.env scripts/create-user.mjs",
 		"backfill-post-blocks": "node --env-file=.env scripts/backfill-post-blocks.mjs",
 		"backfill-post-slugs": "node --env-file=.env scripts/backfill-post-slugs.mjs",
-		"backfill-album-slugs": "node --env-file=.env scripts/backfill-album-slugs.mjs"
+		"backfill-album-slugs": "node --env-file=.env scripts/backfill-album-slugs.mjs",
+		"backfill-photo-dimensions": "node --env-file=.env scripts/backfill-photo-dimensions.mjs"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-node": "^5.5.4",
@@ -33,9 +34,11 @@
 		"vite": "^8.0.16"
 	},
 	"dependencies": {
+		"@altner/astro-justified-gallery-layout": "^0.6.0",
 		"@libsql/client": "^0.17.3",
 		"@tiptap/core": "^3.28.0",
 		"@tiptap/starter-kit": "^3.28.0",
+		"fast-xml-parser": "^5.10.1",
 		"isomorphic-dompurify": "^3.19.0",
 		"leaflet": "^1.9.4",
 		"marked": "^18.0.6",

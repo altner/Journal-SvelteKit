@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import PostCard from '$lib/components/PostCard.svelte';
+	import ActivityFeedCard from '$lib/components/ActivityFeedCard.svelte';
 	let { data }: { data: PageData } = $props();
 
 	let editingId = $state<string | null>(null);
@@ -14,18 +15,28 @@
 	<a class="back" href="/tags">← Alle Tags</a>
 	<h1 class="tag-heading">#{data.tag.name}</h1>
 
-	{#if data.posts.length === 0}
-		<p class="empty">Keine Posts mit diesem Tag.</p>
+	{#if data.items.length === 0}
+		<p class="empty">Nichts mit diesem Tag.</p>
 	{/if}
 
-	{#each data.posts as p (p.id)}
-		<PostCard
-			post={p}
-			user={data.user}
-			editing={editingId === p.id}
-			onEdit={() => (editingId = p.id)}
-			onEditDone={() => (editingId = null)}
-		/>
+	{#each data.items as item (item.kind === 'post' ? item.post.id : item.activity.id)}
+		{#if item.kind === 'post'}
+			<PostCard
+				post={item.post}
+				user={data.user}
+				editing={editingId === item.post.id}
+				onEdit={() => (editingId = item.post.id)}
+				onEditDone={() => (editingId = null)}
+			/>
+		{:else}
+			<ActivityFeedCard
+				activity={item.activity}
+				user={data.user}
+				editing={editingId === item.activity.id}
+				onEdit={() => (editingId = item.activity.id)}
+				onEditDone={() => (editingId = null)}
+			/>
+		{/if}
 	{/each}
 </div>
 

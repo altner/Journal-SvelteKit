@@ -1,19 +1,39 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
-import { desc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, lt, or } from 'drizzle-orm';
 import { album, photo, post } from '$lib/server/db/schema';
 import { saveNewPostBlocks, type BlockMeta } from '$lib/server/blocks';
 import { generateAlbumSlug } from '$lib/server/albums';
 import { randomUUID } from 'node:crypto';
+import { finishPage, PAGE_SIZE, readPageCursor } from '$lib/server/pagination';
 
-export const load: PageServerLoad = async () => {
+export const load: PageServerLoad = async ({ url }) => {
+	const cursor = readPageCursor(url);
+	const cursorWhere = cursor
+		? cursor.direction === 'before'
+			? or(lt(album.createdAt, cursor.date), and(eq(album.createdAt, cursor.date), lt(album.id, cursor.id)))
+			: or(gt(album.createdAt, cursor.date), and(eq(album.createdAt, cursor.date), gt(album.id, cursor.id)))
+		: undefined;
 	const albums = await db.query.album.findMany({
-		orderBy: desc(album.createdAt),
+		where: cursorWhere,
+		orderBy: cursor?.direction === 'after'
+			? [asc(album.createdAt), asc(album.id)]
+			: [desc(album.createdAt), desc(album.id)],
+		limit: PAGE_SIZE + 1,
 		with: { photos: { orderBy: (photo, { asc }) => asc(photo.position), limit: 1 } }
 	});
 
-	return { albums };
+	const page = finishPage(
+		albums.map((a) => ({
+			...a,
+			sortDate: a.createdAt,
+			width: a.photos[0]?.width ?? 4,
+			height: a.photos[0]?.height ?? 3
+		})),
+		cursor?.direction ?? null
+	);
+	return { albums: page.items, pagination: page.pagination };
 };
 
 export const actions: Actions = {

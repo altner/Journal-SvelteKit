@@ -90,11 +90,13 @@ export async function saveNewPostBlocks(
 			.returning();
 
 		for (const file of files) {
-			const { filename } = await saveUploadedPhoto(file);
+			const { filename, width, height } = await saveUploadedPhoto(file);
 			const [createdPhoto] = await db
 				.insert(photo)
 				.values({
 					filename,
+					width,
+					height,
 					originalName: file.name,
 					postId,
 					blockId: createdBlock.id,
@@ -172,9 +174,11 @@ export async function reconcileEditedPostBlocks(
 
 		await db.insert(postBlock).values({ id: meta.id, postId, position: position++, type: 'photos' });
 		for (const file of files) {
-			const { filename } = await saveUploadedPhoto(file);
+			const { filename, width, height } = await saveUploadedPhoto(file);
 			await db.insert(photo).values({
 				filename,
+				width,
+				height,
 				originalName: file.name,
 				postId,
 				blockId: meta.id,

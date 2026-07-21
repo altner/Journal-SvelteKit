@@ -1,5 +1,4 @@
 <script lang="ts">
-	import favicon from '$lib/assets/favicon.svg';
 	import '$lib/app.css';
 	import { page } from '$app/state';
 	import Footer from '$lib/components/Footer.svelte';
@@ -7,22 +6,26 @@
 
 	let { children, data } = $props();
 
+	// "Alben" bewusst nicht in der Navigation - erreichbar über den "Alben"-Tab auf /photos
+	// (PhotoTabs.svelte).
 	const navItems = [
 		{ href: '/', label: 'Feed' },
+		{ href: '/posts', label: 'Beiträge' },
 		{ href: '/photos', label: 'Fotos' },
-		{ href: '/albums', label: 'Alben' },
+		{ href: '/activities', label: 'Aktivitäten' },
 		{ href: '/tags', label: 'Tags' }
 	];
-	// Mobile-Topnav hat weniger Platz als die Desktop-Sidebar - "Alben" bleibt bewusst draußen,
-	// "Tags" soll aber sichtbar sein.
-	const mobileNavItems = navItems.filter((item) => item.href !== '/albums');
+	// Mobile-Topnav hat weniger Platz als die Desktop-Sidebar - "Aktivitäten" bleibt bewusst
+	// draußen, "Tags" soll aber sichtbar sein.
+	const mobileNavItems = navItems.filter((item) => item.href !== '/activities');
 
 	const isLoginPage = $derived(page.url.pathname === '/login');
 	const isFeedPage = $derived(page.url.pathname === '/');
 </script>
 
 <svelte:head>
-	<link rel="icon" href={favicon} />
+	<link rel="icon" href="/favicon.ico" sizes="any" />
+	<link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
 	{#if !page.data.description}
 		<meta name="description" content="my digital corner on the web" />
 	{/if}
@@ -67,8 +70,11 @@
 		{#if isFeedPage && page.data.clusters}
 			<PostTimeline clusters={page.data.clusters} />
 		{/if}
-		<Footer desktopRail={!isLoginPage} />
 	</aside>
+
+	<div class="site-footer" class:hidden-desktop-login={isLoginPage}>
+		<Footer />
+	</div>
 </div>
 
 <style>
@@ -181,6 +187,13 @@
 			display: flex;
 			flex-direction: column;
 			gap: 16px;
+		}
+		.site-footer {
+			grid-column: 1 / -1;
+			margin-top: 24px;
+		}
+		.site-footer.hidden-desktop-login {
+			display: none;
 		}
 	}
 </style>

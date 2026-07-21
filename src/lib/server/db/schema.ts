@@ -85,6 +85,8 @@ export const photo = sqliteTable('photo', {
 	id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
 	filename: text('filename').notNull(), // name on disk, served via /uploads/[filename]
 	originalName: text('original_name'),
+	width: integer('width'),
+	height: integer('height'),
 	postId: text('post_id')
 		.notNull()
 		.references(() => post.id, { onDelete: 'cascade' }),
@@ -132,11 +134,88 @@ export const postTag = sqliteTable(
 	(t) => [unique('post_tag_post_id_tag_id_unique').on(t.postId, t.tagId)]
 );
 
+export const activity = sqliteTable('activity', {
+	id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+	// URL slug, generated once at creation (from title, or the activity's own id as fallback) —
+	// same scheme as post.slug/album.slug, see generateActivitySlug in activities.ts.
+	slug: text('slug').unique(),
+	// Always populated at insert time (user input, or an auto-generated fallback like "Lauf am
+	// 21.07.2026" derived from sport+startedAt) — follows album.title's convention (always set),
+	// not post.title's (genuinely optional). NOT NULL is safe here since this is a brand-new,
+	// empty table (the db:push ALTER-TABLE danger from CLAUDE.md only applies to adding a NOT
+	// NULL column to an already-populated table, not to CREATE TABLE).
+	title: text('title').notNull(),
+	sport: text('sport', { enum: ['running', 'cycling', 'hiking', 'walking', 'other'] }).notNull(),
+	// Computed from the full-resolution parsed GPX track at insert time (haversine sum), never
+	// from trackPoints below (that's only the downsampled map rendering).
+	distanceMeters: real('distance_meters').notNull(),
+	// Elapsed time: last trkpt timestamp minus first, across all segments/tracks concatenated —
+	// includes any auto-pause gaps, this is elapsed time, not moving time.
+	durationSeconds: integer('duration_seconds').notNull(),
+	// Sum of positive elevation deltas between consecutive points. NULL when any point in the
+	// track is missing <ele> — a partial sum across a data gap would be silently wrong, so
+	// "unknown" means fully unknown, not best-effort.
+	elevationGainMeters: real('elevation_gain_meters'),
+	startedAt: integer('started_at', { mode: 'timestamp' }).notNull(),
+	// Server-generated name for the raw stored track file on disk (e.g. "<uuid>.gpx"), mirrors
+	// photo.filename. The extension drives both MIME lookup (uploads/[filename]/+server.ts) and
+	// future format dispatch (parseGpxTrack today, parseFitTrack later keyed off the same
+	// extension) — no separate sourceFormat column needed.
+	filename: text('filename').notNull(),
+	originalName: text('original_name'),
+	// JSON-stringified, downsampled [[lat, lng], ...] array (capped ~500 points, even-interval
+	// sampling preserving first+last exactly) — read-only map rendering only, never re-parsed
+	// for stats.
+	trackPoints: text('track_points').notNull(),
+	authorId: text('author_id')
+		.notNull()
+		.references(() => user.id, { onDelete: 'cascade' }),
+	createdAt: integer('created_at', { mode: 'timestamp' })
+		.notNull()
+		.$defaultFn(() => new Date())
+});
+
+export const activityPhoto = sqliteTable('activity_photo', {
+	id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+	activityId: text('activity_id')
+		.notNull()
+		.references(() => activity.id, { onDelete: 'cascade' }),
+	filename: text('filename').notNull(),
+	originalName: text('original_name'),
+	width: integer('width'),
+	height: integer('height'),
+	position: integer('position').notNull().default(0),
+	createdAt: integer('created_at', { mode: 'timestamp' })
+		.notNull()
+		.$defaultFn(() => new Date())
+});
+
+// Junction table: an activity can have many tags, a tag can be on many activities — mirrors
+// postTag exactly (a dedicated table per entity, not a polymorphic one, matching this project's
+// existing convention).
+export const activityTag = sqliteTable(
+	'activity_tag',
+	{
+		id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+		activityId: text('activity_id')
+			.notNull()
+			.references(() => activity.id, { onDelete: 'cascade' }),
+		tagId: text('tag_id')
+			.notNull()
+			.references(() => tag.id, { onDelete: 'cascade' }),
+		createdAt: integer('created_at', { mode: 'timestamp' })
+			.notNull()
+			.$defaultFn(() => new Date())
+	},
+	(t) => [unique('activity_tag_activity_id_tag_id_unique').on(t.activityId, t.tagId)]
+);
+
 // ---------- Relations ----------
 
 export const userRelations = relations(user, ({ many }) => ({
 	posts: many(post),
-	albums: many(album)
+	albums: many(album),
+	activities: many(activity)
 }));
 
 export const postRelations = relations(post, ({ one, many }) => ({
@@ -164,7 +243,23 @@ export const photoRelations = relations(photo, ({ one }) => ({
 }));
 
 export const tagRelations = relations(tag, ({ many }) => ({
-	posts: many(postTag)
+	posts: many(postTag),
+	activities: many(activityTag)
+}));
+
+export const activityRelations = relations(activity, ({ one, many }) => ({
+	author: one(user, { fields: [activity.authorId], references: [user.id] }),
+	tags: many(activityTag),
+	photos: many(activityPhoto)
+}));
+
+export const activityPhotoRelations = relations(activityPhoto, ({ one }) => ({
+	activity: one(activity, { fields: [activityPhoto.activityId], references: [activity.id] })
+}));
+
+export const activityTagRelations = relations(activityTag, ({ one }) => ({
+	activity: one(activity, { fields: [activityTag.activityId], references: [activity.id] }),
+	tag: one(tag, { fields: [activityTag.tagId], references: [tag.id] })
 }));
 
 export const postTagRelations = relations(postTag, ({ one }) => ({

@@ -1,5 +1,5 @@
 import { db } from '$lib/server/db';
-import { tag, postTag } from '$lib/server/db/schema';
+import { tag, postTag, activityTag } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 import { slugify } from '$lib/server/slug';
 
@@ -48,5 +48,17 @@ export async function setPostTags(postId: string, rawNames: string[]): Promise<v
 
 	for (const tagId of tagIds) {
 		await db.insert(postTag).values({ postId, tagId });
+	}
+}
+
+/** Replaces an activity's entire tag set — same delete-then-reinsert scheme as setPostTags,
+ *  used by both activity upload and activity editing. */
+export async function setActivityTags(activityId: string, rawNames: string[]): Promise<void> {
+	const tagIds = await resolveOrCreateTags(rawNames);
+
+	await db.delete(activityTag).where(eq(activityTag.activityId, activityId));
+
+	for (const tagId of tagIds) {
+		await db.insert(activityTag).values({ activityId, tagId });
 	}
 }

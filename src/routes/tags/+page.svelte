@@ -16,7 +16,7 @@
 
 	<div class="tag-list">
 		{#each data.tags as t (t.id)}
-			<a class="tag-pill" href="/tags/{t.slug}">{t.name} <span class="count">{t.postCount}</span></a>
+			<a class="tag-pill" href="/tags/{t.slug}">{t.name} <span class="count">{t.count}</span></a>
 		{/each}
 	</div>
 </div>
