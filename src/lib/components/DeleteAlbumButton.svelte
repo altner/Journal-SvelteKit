@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 
-	let { albumId, afterDelete }: { albumId: string; afterDelete?: () => void } = $props();
+	let { albumSlug, afterDelete }: { albumSlug: string; afterDelete?: () => void } = $props();
 
 	let error = $state<string | undefined>();
 
@@ -14,7 +14,7 @@
 
 <form
 	method="POST"
-	action="/albums/{albumId}?/deleteAlbum"
+	action="/albums/{albumSlug}?/deleteAlbum"
 	class="delete-form"
 	onsubmit={onSubmit}
 	use:enhance={() => {

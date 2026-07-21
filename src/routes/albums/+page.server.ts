@@ -4,6 +4,7 @@ import { db } from '$lib/server/db';
 import { desc, eq, inArray } from 'drizzle-orm';
 import { album, photo, post } from '$lib/server/db/schema';
 import { saveNewPostBlocks, type BlockMeta } from '$lib/server/blocks';
+import { generateAlbumSlug } from '$lib/server/albums';
 import { randomUUID } from 'node:crypto';
 
 export const load: PageServerLoad = async () => {
@@ -43,10 +44,16 @@ export const actions: Actions = {
 		];
 		const { nonExcludedPhotoIds } = await saveNewPostBlocks(createdPost.id, blocksMeta, data);
 
+		const albumTitleFinal = albumTitle || 'Neues Album';
+		const albumId = randomUUID();
+		const albumSlug = await generateAlbumSlug(albumTitleFinal, albumId);
+
 		const [createdAlbum] = await db
 			.insert(album)
 			.values({
-				title: albumTitle || 'Neues Album',
+				id: albumId,
+				slug: albumSlug,
+				title: albumTitleFinal,
 				originPostId: createdPost.id,
 				authorId: user.id,
 				createdAt
@@ -59,6 +66,6 @@ export const actions: Actions = {
 			.set({ albumId: createdAlbum.id })
 			.where(inArray(photo.id, nonExcludedPhotoIds));
 
-		throw redirect(303, `/albums/${createdAlbum.id}`);
+		throw redirect(303, `/albums/${encodeURIComponent(createdAlbum.slug ?? createdAlbum.id)}`);
 	}
 };

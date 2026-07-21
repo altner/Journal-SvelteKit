@@ -72,7 +72,7 @@
 
 	<div class="grid">
 		{#each data.albums as a (a.id)}
-			<a class="card tile" href="/albums/{a.id}">
+			<a class="card tile" href="/albums/{a.slug ?? a.id}">
 				{#if a.photos[0]}
 					<img src="/uploads/{a.photos[0].filename}" alt="" />
 				{:else}

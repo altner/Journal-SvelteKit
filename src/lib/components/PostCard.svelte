@@ -19,6 +19,7 @@
 	}: {
 		post: {
 			id: string;
+			slug: string | null;
 			title: string | null;
 			createdAt: Date | string;
 			isStatusPost: boolean;
@@ -26,6 +27,7 @@
 			blocks: Block[];
 			album: {
 				id: string;
+				slug: string | null;
 				title: string;
 				originPostId: string | null;
 				photos: { id: string; filename: string; postId: string }[];
@@ -90,13 +92,13 @@
 	<div class="post-header">
 		<div class="post-meta">
 			{#if !editing}
-				<div class="post-title">{post.title || 'Ohne Titel'}</div>
+				<div class="post-title"><a href="/posts/{post.slug ?? post.id}">{post.title || 'Ohne Titel'}</a></div>
 			{/if}
 			<div class="post-sub">
-				<a href="/posts/{post.id}">{formatDate(post.createdAt)}</a>
+				<span>{formatDate(post.createdAt)}</span>
 				{#if post.album}
 					<span>·</span>
-					<a href="/albums/{post.album.id}">📁 {post.album.title}</a>
+					<a href="/albums/{post.album.slug ?? post.album.id}">📁 {post.album.title}</a>
 				{/if}
 			</div>
 			{#if post.latitude != null && post.longitude != null}
@@ -122,14 +124,14 @@
 				{#if !post.isStatusPost && !editing}
 					<button type="button" class="edit-btn" onclick={() => onEdit?.()}>Bearbeiten</button>
 				{/if}
-				<DeletePostButton postId={post.id} {afterDelete} />
+				<DeletePostButton postSlug={post.slug ?? post.id} {afterDelete} />
 			</div>
 		{/if}
 	</div>
 
 	{#if editing}
 		<EditPostForm
-			postId={post.id}
+			postSlug={post.slug ?? post.id}
 			title={post.title}
 			blocks={editableBlocks()}
 			tags={post.tags.map((t) => t.name)}
@@ -191,6 +193,13 @@
 		font-weight: 600;
 		font-size: 15px;
 		line-height: 1.3;
+	}
+	.post-title a {
+		color: inherit;
+		text-decoration: none;
+	}
+	.post-title a:hover {
+		text-decoration: underline;
 	}
 	.post-sub {
 		display: flex;

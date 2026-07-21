@@ -5,7 +5,7 @@
 	import BlockEditor from './BlockEditor.svelte';
 
 	let {
-		postId,
+		postSlug,
 		title,
 		blocks,
 		tags = [],
@@ -13,7 +13,7 @@
 		onSaved,
 		onCancel
 	}: {
-		postId: string;
+		postSlug: string;
 		title: string | null;
 		blocks: (
 			| { id: string; type: 'text'; text: string }
@@ -41,7 +41,7 @@
 
 <form
 	method="POST"
-	action="/posts/{postId}?/edit"
+	action="/posts/{postSlug}?/edit"
 	enctype="multipart/form-data"
 	class="edit-form"
 	use:enhance={() => {

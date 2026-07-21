@@ -5,10 +5,20 @@
 	let { data }: { data: PageData } = $props();
 
 	let editing = $state(false);
+
+	const headTitle = $derived(`${data.post.title || 'Post'} · achis.blog`);
 </script>
 
 <svelte:head>
-	<title>{data.post.title || 'Post'} · achis.blog</title>
+	<title>{headTitle}</title>
+	{#if data.description}<meta name="description" content={data.description} />{/if}
+	<link rel="canonical" href={data.canonicalUrl} />
+	<meta property="og:type" content="article" />
+	<meta property="og:title" content={headTitle} />
+	{#if data.description}<meta property="og:description" content={data.description} />{/if}
+	<meta property="og:url" content={data.canonicalUrl} />
+	{#if data.ogImage}<meta property="og:image" content={data.ogImage} />{/if}
+	<meta name="twitter:card" content={data.ogImage ? 'summary_large_image' : 'summary'} />
 </svelte:head>
 
 <div class="page">

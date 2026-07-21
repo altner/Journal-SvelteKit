@@ -1,14 +1,9 @@
 import { db } from '$lib/server/db';
 import { tag, postTag } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
+import { slugify } from '$lib/server/slug';
 
-export function slugifyTag(name: string): string {
-	return name
-		.trim()
-		.toLowerCase()
-		.replace(/[^\p{L}\p{N}]+/gu, '-')
-		.replace(/^-+|-+$/g, '');
-}
+export const slugifyTag = slugify;
 
 /** Parses the comma-joined `tags` FormData field the shared TagInput chip UI always submits. */
 export function parseTagsField(raw: FormDataEntryValue | null): string[] {

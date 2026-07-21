@@ -10,6 +10,7 @@ declare global {
 		}
 		interface PageData {
 			clusters?: YearGroup[];
+			description?: string;
 		}
 		interface PageState {
 			lightboxPhotoId?: string;

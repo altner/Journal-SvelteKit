@@ -4,13 +4,20 @@ import { db } from '$lib/server/db';
 import { eq, desc, inArray } from 'drizzle-orm';
 import { album, photo, post, postBlock } from '$lib/server/db/schema';
 import { deleteUploadedPhoto } from '$lib/server/storage';
-import { deletePostCascade, isPostNowEmpty } from '$lib/server/posts';
+import { deletePostCascade, isPostNowEmpty, generatePostSlug } from '$lib/server/posts';
+import { findAlbumBySlugOrId } from '$lib/server/albums';
 import { saveNewPostBlocks, pruneEmptyPhotoBlocks, type BlockMeta } from '$lib/server/blocks';
 import { randomUUID } from 'node:crypto';
 
-export const load: PageServerLoad = async ({ params }) => {
+export const load: PageServerLoad = async ({ params, url }) => {
+	const resolved = await findAlbumBySlugOrId(params.slug);
+	if (!resolved) throw error(404, 'Album nicht gefunden');
+	if (resolved.matchedBy === 'id' && resolved.album.slug) {
+		throw redirect(301, `/albums/${encodeURIComponent(resolved.album.slug)}`);
+	}
+
 	const found = await db.query.album.findFirst({
-		where: eq(album.id, params.id),
+		where: eq(album.id, resolved.album.id),
 		with: {
 			photos: { orderBy: (photo, { asc }) => asc(photo.position) }
 		}
@@ -18,7 +25,19 @@ export const load: PageServerLoad = async ({ params }) => {
 
 	if (!found) throw error(404, 'Album nicht gefunden');
 
-	return { album: found };
+	const originPost = found.originPostId
+		? await db.query.post.findFirst({
+				where: eq(post.id, found.originPostId),
+				columns: { slug: true }
+			})
+		: null;
+
+	return {
+		album: found,
+		originPostSlug: originPost?.slug ?? found.originPostId,
+		canonicalUrl: `${url.origin}/albums/${found.slug}`,
+		ogImage: found.photos[0] ? `${url.origin}/uploads/${found.photos[0].filename}` : null
+	};
 };
 
 export const actions: Actions = {
@@ -26,7 +45,10 @@ export const actions: Actions = {
 		const user = locals.user;
 		if (!user) return fail(401, { error: 'Bitte melde dich an.' });
 
-		const found = await db.query.album.findFirst({ where: eq(album.id, params.id) });
+		const resolved = await findAlbumBySlugOrId(params.slug);
+		if (!resolved) throw error(404, 'Album nicht gefunden');
+
+		const found = await db.query.album.findFirst({ where: eq(album.id, resolved.album.id) });
 		if (!found) throw error(404, 'Album nicht gefunden');
 
 		const data = await request.formData();
@@ -53,9 +75,14 @@ export const actions: Actions = {
 				? `Ein neues Foto zum Album "${found.title}" wurde hinzugefügt`
 				: `Neue Fotos zum Album "${found.title}" wurden hinzugefügt`;
 
+		const id = randomUUID();
+		const slug = await generatePostSlug(title, id);
+
 		const [createdPost] = await db
 			.insert(post)
 			.values({
+				id,
+				slug,
 				title,
 				authorId: user.id,
 				albumId: found.id,
@@ -78,11 +105,14 @@ export const actions: Actions = {
 		const user = locals.user;
 		if (!user) return fail(401, { error: 'Bitte melde dich an.' });
 
+		const resolved = await findAlbumBySlugOrId(params.slug);
+		if (!resolved) throw error(404, 'Album nicht gefunden');
+
 		const data = await request.formData();
 		const photoId = String(data.get('photoId') ?? '');
 
 		const found = await db.query.photo.findFirst({ where: eq(photo.id, photoId) });
-		if (!found || found.albumId !== params.id) {
+		if (!found || found.albumId !== resolved.album.id) {
 			throw error(404, 'Foto nicht gefunden');
 		}
 
@@ -104,8 +134,11 @@ export const actions: Actions = {
 		const user = locals.user;
 		if (!user) return fail(401, { error: 'Bitte melde dich an.' });
 
+		const resolved = await findAlbumBySlugOrId(params.slug);
+		if (!resolved) throw error(404, 'Album nicht gefunden');
+
 		const found = await db.query.album.findFirst({
-			where: eq(album.id, params.id),
+			where: eq(album.id, resolved.album.id),
 			with: { photos: true }
 		});
 		if (!found) throw error(404, 'Album nicht gefunden');

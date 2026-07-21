@@ -1,15 +1,22 @@
-import { error, fail } from '@sveltejs/kit';
+import { error, fail, redirect } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 import { db } from '$lib/server/db';
 import { eq } from 'drizzle-orm';
 import { post } from '$lib/server/db/schema';
-import { deletePostCascade } from '$lib/server/posts';
+import { deletePostCascade, findPostBySlugOrId } from '$lib/server/posts';
 import { setPostTags, parseTagsField } from '$lib/server/tags';
 import { parseBlocksMeta, reconcileEditedPostBlocks, blocksMetaHasContent } from '$lib/server/blocks';
+import { buildPostExcerpt, pickPostOgImage } from '$lib/server/seo';
 
-export const load: PageServerLoad = async ({ params }) => {
+export const load: PageServerLoad = async ({ params, url }) => {
+	const resolved = await findPostBySlugOrId(params.slug);
+	if (!resolved) throw error(404, 'Post nicht gefunden');
+	if (resolved.matchedBy === 'id' && resolved.post.slug) {
+		throw redirect(301, `/posts/${encodeURIComponent(resolved.post.slug)}`);
+	}
+
 	const found = await db.query.post.findFirst({
-		where: eq(post.id, params.id),
+		where: eq(post.id, resolved.post.id),
 		with: {
 			blocks: {
 				orderBy: (block, { asc }) => asc(block.position),
@@ -26,7 +33,14 @@ export const load: PageServerLoad = async ({ params }) => {
 
 	if (!found) throw error(404, 'Post nicht gefunden');
 
-	return { post: { ...found, tags: found.tags.map((pt) => pt.tag) } };
+	const ogImageFilename = pickPostOgImage(found);
+
+	return {
+		post: { ...found, tags: found.tags.map((pt) => pt.tag) },
+		description: buildPostExcerpt(found.blocks),
+		canonicalUrl: `${url.origin}/posts/${found.slug}`,
+		ogImage: ogImageFilename ? `${url.origin}/uploads/${ogImageFilename}` : null
+	};
 };
 
 export const actions: Actions = {
@@ -34,8 +48,11 @@ export const actions: Actions = {
 		const user = locals.user;
 		if (!user) return fail(401, { error: 'Bitte melde dich an.' });
 
+		const resolved = await findPostBySlugOrId(params.slug);
+		if (!resolved) throw error(404, 'Post nicht gefunden');
+
 		const found = await db.query.post.findFirst({
-			where: eq(post.id, params.id),
+			where: eq(post.id, resolved.post.id),
 			with: { photos: true, album: true }
 		});
 		if (!found) throw error(404, 'Post nicht gefunden');
@@ -47,8 +64,11 @@ export const actions: Actions = {
 		const user = locals.user;
 		if (!user) return fail(401, { error: 'Bitte melde dich an.' });
 
+		const resolved = await findPostBySlugOrId(params.slug);
+		if (!resolved) throw error(404, 'Post nicht gefunden');
+
 		const found = await db.query.post.findFirst({
-			where: eq(post.id, params.id),
+			where: eq(post.id, resolved.post.id),
 			with: { blocks: { with: { photos: true } } }
 		});
 		if (!found) throw error(404, 'Post nicht gefunden');

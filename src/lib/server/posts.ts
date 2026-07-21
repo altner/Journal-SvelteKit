@@ -2,6 +2,7 @@ import { db } from '$lib/server/db';
 import { eq } from 'drizzle-orm';
 import { post, photo, album, postTag, postBlock } from '$lib/server/db/schema';
 import { deleteUploadedPhoto } from '$lib/server/storage';
+import { slugify } from '$lib/server/slug';
 
 type DeletablePost = {
 	id: string;
@@ -28,6 +29,37 @@ export async function deletePostCascade(found: DeletablePost): Promise<void> {
 	// they don't cascade on their own just because the DDL says so.
 	await db.delete(postBlock).where(eq(postBlock.postId, found.id));
 	await db.delete(post).where(eq(post.id, found.id));
+}
+
+/** Generates a unique URL slug for a new post. Base is the slugified title; falls back to the
+ *  post's own id (already guaranteed unique) when there's no usable title (none given, or a title
+ *  that slugifies to nothing, e.g. emoji-only). On a collision (e.g. two addPhotos status posts
+ *  for the same album producing the identical auto-generated title), appends -2, -3, ... until
+ *  free. Must be called with the post's id already decided (before insert), since the id may
+ *  itself become the slug. */
+export async function generatePostSlug(title: string | null, id: string): Promise<string> {
+	const base = slugify(title ?? '') || id;
+	let candidate = base;
+	let n = 2;
+	while (await db.query.post.findFirst({ where: eq(post.slug, candidate) })) {
+		candidate = `${base}-${n++}`;
+	}
+	return candidate;
+}
+
+/** Resolves a `/posts/[slug]` route param to a post, trying the slug first and falling back to a
+ *  raw id match for links shared/indexed before this post had a slug. Callers should 301-redirect
+ *  to the canonical slug URL when `matchedBy === 'id'`. */
+export async function findPostBySlugOrId(
+	param: string
+): Promise<{ post: { id: string; slug: string | null }; matchedBy: 'slug' | 'id' } | null> {
+	const bySlug = await db.query.post.findFirst({ where: eq(post.slug, param) });
+	if (bySlug) return { post: bySlug, matchedBy: 'slug' };
+
+	const byId = await db.query.post.findFirst({ where: eq(post.id, param) });
+	if (byId) return { post: byId, matchedBy: 'id' };
+
+	return null;
 }
 
 /** A post with no remaining photos and no user-authored content is an empty shell that can be

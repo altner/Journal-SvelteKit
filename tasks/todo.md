@@ -1,5 +1,113 @@
 # Todo
 
+## Kanonische URLs + SEO-Metadaten für Alben & Einzelfotos — erledigt
+
+Direkte Fortsetzung des Posts-Features (siehe unten). Nutzerentscheidung per Rückfrage: Alben
+bekommen exakt dieselbe Slug-Behandlung wie Posts (Titel existiert, eindeutig genug). Einzelne
+Fotos bekommen bewusst **keinen eigenen Slug** — sie haben keinen Titel/Inhalt, nur Metadaten
+(Canonical-Link, og:image = das Foto selbst, og:title vom zugehörigen Post/Album), URL bleibt bei
+der rohen Foto-ID.
+
+- [x] `album.slug` (nullable + unique, wie `post.slug`), per `sqlite3` lokal ergänzt
+- [x] `src/lib/server/albums.ts` neu: `generateAlbumSlug()`/`findAlbumBySlugOrId()`, spiegelt
+      `posts.ts`s Pendants 1:1
+- [x] **Drei** Album-Erstellungsstellen gefunden und alle auf `id`+`slug` umgestellt:
+      `albums/+page.server.ts` (`createAlbum`), `posts/new/+page.server.ts` (`saveAsAlbum`-Zweig),
+      `photos/+page.server.ts` (`createAlbumFromSelection`, beim Ersuchen zuerst übersehen, im
+      Nachhinein per Grep-Sweep über `insert(album)` gefunden)
+- [x] `scripts/backfill-album-slugs.mjs` + `npm run backfill-album-slugs` (lokale Dev-DB hatte 0
+      Alben, daher No-Op, aber vor dem nächsten Deploy nötig)
+- [x] Route `albums/[id]` → `albums/[slug]` umbenannt (inkl. `photo/[photoId]`), Load/Actions lösen
+      per `findAlbumBySlugOrId` auf, `redirect(301, ...)` bei Alt-Link über die rohe ID
+- [x] Canonical/OG-Metadaten auf `albums/[slug]/+page.svelte` (kein Description-Tag — Alben haben
+      keine eigene Textquelle, Layout-Fallback greift)
+- [x] Metadaten (Canonical, og:image, og:title) auf allen drei Foto-Permalink-Kontexten ergänzt:
+      `posts/[slug]/photo/[photoId]` (og:description via bestehendes `buildPostExcerpt`),
+      `albums/[slug]/photo/[photoId]`, `photos/[photoId]` (Stream-Kontext — hatte bisher gar keinen
+      Post-Bezug geladen, dafür eine gezielte Zusatzabfrage auf den Titel des besitzenden Posts
+      ergänzt, nur für das jeweils angezeigte Foto, nicht die ganze Liste)
+- [x] Interne Links umgestellt: `PostCard.svelte` (Album-Pill), `DeleteAlbumButton.svelte`
+      (`albumId`-Prop zu `albumSlug`), `albums/+page.svelte`-Übersicht
+- [x] **Bug beim eigenen Testen gefunden + gefixt (betraf auch das bereits gemergte Posts-Feature!):**
+      alle `redirect(301/303, ...)`-Aufrufe, die einen Slug mit Nicht-ASCII-Zeichen (Umlaute) roh in
+      die Ziel-URL einsetzten, schickten den `Location`-Header mit rohen UTF-8-Bytes statt
+      Prozent-Kodierung — HTTP-Header dürfen das nicht, das Ergebnis war ein kaputtes Zeichen
+      (`%E4` statt `%C3%A4`, per `curl -D -` am rohen Header bestätigt). Betraf **7 Stellen**
+      insgesamt (4 neue Album-Redirects + 3 bereits vom Posts-Feature: `posts/[slug]` load,
+      `posts/[slug]/photo/[photoId]` load, sowie die beiden `redirect(303, /albums/{slug})` nach
+      Alben-Erstellung) — alle mit `encodeURIComponent()` um das Slug-Segment gefixt. Ohne diesen
+      Fund wäre jeder alte rohe-ID-Link zu einem Post/Album mit Umlauten im Titel nach dem Redirect
+      auf eine kaputte 404-URL gelandet
+- [x] `npm run check` — 0 Fehler
+- [x] Im Browser + `curl` (Datei-Uploads lassen sich über das Browser-Automatisierungstool nicht
+      simulieren, bekannte Einschränkung) mit temporärem QA-User (danach gelöscht) end-to-end
+      getestet: Album mit Umlaut-Titel über `posts/new`s `saveAsAlbum`-Zweig erstellt (2 echte
+      PNG-Testfotos per multipart) → korrekter Slug `testalbum-verify-ärger`; Album-Seite zeigt
+      korrekte Canonical-/OG-Metadaten, Fotogrid verlinkt korrekt auf Slug-basierte Foto-URLs;
+      Foto-Permalink in allen drei Kontexten (post-, album-, stream-scoped) mit korrekten
+      Metadaten/og:image bestätigt; alter roher Album-Link redirectet nach dem Fix korrekt (per
+      `curl`-Header UND im Browser verifiziert — erste Browser-Prüfung zeigte fälschlich noch den
+      kaputten gecachten 301 von vor dem Fix, mit `?cachebust`-Query-Param umgangen); Album- und
+      Post-Löschung (Kaskade) hinterließen keine Datei-Waisen; Test-Alben/-Posts/-User danach
+      vollständig entfernt (lokale DB wieder im Ausgangszustand, nur der vorbestehende `TEST`-Post
+      übrig)
+- [ ] Nicht deployed — Produktions-DB braucht dieselbe `ALTER TABLE`/Unique-Index-Ergänzung für
+      `album.slug` plus `npm run backfill-album-slugs` vor dem nächsten `db:push` (zusätzlich zum
+      bereits offenen `backfill-post-slugs`-Punkt aus dem Posts-Feature unten)
+
+## Kanonische URLs + SEO-Metadaten für Posts — erledigt
+
+Plan mit dem Nutzer abgestimmt (Details: `/Users/adrian/.claude/plans/k-nnen-wir-den-posts-polished-sprout.md`).
+Nutzerentscheidungen: Slug IST die URL (`/posts/{slug}`, nicht nur dekorativ neben der ID), Status-
+Posts bekommen keine SEO-Sonderbehandlung (kein `noindex`) — sie hatten schon immer einen
+auto-generierten Titel und werden dadurch automatisch genauso behandelt wie echte Posts.
+
+- [x] `src/lib/server/slug.ts` neu: generisches `slugify()`, aus `tags.ts`s `slugifyTag()`
+      verallgemeinert (`slugifyTag` bleibt als dünner Re-Export bestehen, keine Call-Site-Änderung)
+- [x] Neue Spalte `post.slug` (nullable + `unique()` — SQLite erlaubt mehrere NULLs unter einem
+      UNIQUE-Index, folgt damit demselben sicheren Muster wie die GPS-Spalten). Per `sqlite3` direkt
+      angelegt (`ALTER TABLE` + `CREATE UNIQUE INDEX`), kein `db:push`-Risiko
+- [x] `src/lib/server/posts.ts`: `generatePostSlug(title, id)` (Basis = `slugify(title)`, fällt bei
+      leerem/unbrauchbarem Titel auf die eigene UUID zurück, `-2`/`-3`-Suffix bei Kollision) +
+      `findPostBySlugOrId(param)` (Slug zuerst, dann ID als Rückwärtskompat-Fallback für Alt-Links)
+- [x] **Slug ist unveränderlich** — wird einmalig bei Erstellung generiert (`id` dafür jetzt per
+      `randomUUID()` selbst erzeugt statt Schema-Default, da er ggf. selbst als Slug-Basis dient)
+      und bleibt beim späteren Bearbeiten des Titels bewusst bestehen (kein Redirect-Tabellen-Bedarf)
+- [x] `scripts/backfill-post-slugs.mjs` neu (idempotent, Vorbild `backfill-post-blocks.mjs`),
+      `npm run backfill-post-slugs` — lokal einmalig gelaufen (1 bestehender Post: `TEST` → `test`)
+- [x] Route `posts/[id]` → `posts/[slug]` umbenannt (inkl. `photo/[photoId]`-Unterordner); Laden/
+      Actions lösen jetzt per `findPostBySlugOrId` auf, `redirect(301, ...)` bei Treffer über die
+      alte rohe ID (Alt-Links bleiben funktionsfähig)
+- [x] `PhotoGrid.svelte` bewusst **unverändert** gelassen — Foto-Permalinks bauen weiterhin auf der
+      rohen `photo.postId` auf, die umbenannte Route löst ID oder Slug transparent auf
+- [x] SEO-Metadaten auf der Post-Seite: `<link rel="canonical">`, `og:*`, `twitter:card`,
+      Description aus dem ersten Text-Block (`src/lib/server/seo.ts`, grobe Markdown-Bereinigung +
+      Kürzung auf ~160 Zeichen), OG-Bild unter Beachtung der "Origin-Post zeigt `album.photos`"-Regel
+- [x] **Bug beim eigenen Testen gefunden + gefixt:** `app.html` hatte eine statische
+      `<meta name="description">`, die zusätzlich zur neuen Pro-Seiten-Description im DOM landete —
+      zwei `meta[name=description]`-Tags gleichzeitig, Browser/Crawler nehmen den ersten (die
+      statische, generische) und ignorieren die neue. Fix: statisches Tag aus `app.html` entfernt,
+      stattdessen bedingt im Root-`+layout.svelte` gerendert (`{#if !page.data.description}`) —
+      Fallback bleibt für alle Seiten ohne eigene Description erhalten, `App.PageData.description?`
+      in `app.d.ts` ergänzt
+- [x] Interne Links auf `post.slug` umgestellt: `PostCard.svelte`-Permalink,
+      `DeletePostButton`/`EditPostForm` (`postId`-Prop zu `postSlug` umbenannt, Formular-`action`
+      zeigt jetzt auf die Slug-URL), `albums/[id]`s "Zum Ursprungs-Post"-Link (neue Zusatzabfrage im
+      Load für den Origin-Post-Slug)
+- [x] `npm run check` — 0 Fehler
+- [x] Im Browser mit temporärem QA-User (danach gelöscht) end-to-end getestet: Post mit Umlauten im
+      Titel ("Ärger im Café – Größenwahn?!") → Slug `ärger-im-café-größenwahn`; Titel danach
+      bearbeitet → URL bleibt exakt gleich (Unveränderlichkeit bestätigt); zweiter Post mit
+      identischem Titel wie ein bestehender ("TEST") → Slug korrekt `test-2`; alte rohe UUID-URL
+      (Post- **und** Foto-Permalink) redirectet korrekt mit 301 auf die neue Slug-URL; Canonical-
+      Link/OG-Tags/Twitter-Card per DOM-Inspektion bestätigt; Test-Posts + Test-User danach wieder
+      vollständig entfernt (lokale DB im Ausgangszustand)
+- [x] Album/Status-Post-Fall (`addPhotos`) nur per Code-Review + Typecheck verifiziert, nicht live
+      im Browser — kein Album in der lokalen Dev-DB vorhanden und Datei-Uploads lassen sich über das
+      Browser-Automatisierungstool nicht simulieren (bekannte Einschränkung, siehe frühere Einträge)
+- [ ] Nicht deployed — Produktions-DB braucht dieselbe `ALTER TABLE`/Unique-Index-Ergänzung plus
+      `npm run backfill-post-slugs` vor dem nächsten `db:push`
+
 ## Sicherheitshärtung: Login-Rate-Limiting + Security-Header — erledigt
 
 Auf Nachfrage des Nutzers nach einem Security-Review (Login/Manipulation). Review-Ergebnis: Login/

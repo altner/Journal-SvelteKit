@@ -6,6 +6,8 @@ import { desc, isNull, or, eq, inArray } from 'drizzle-orm';
 import { deleteUploadedPhoto } from '$lib/server/storage';
 import { deletePostCascade, isPostNowEmpty } from '$lib/server/posts';
 import { pruneEmptyPhotoBlocks } from '$lib/server/blocks';
+import { generateAlbumSlug } from '$lib/server/albums';
+import { randomUUID } from 'node:crypto';
 
 export const load: PageServerLoad = async () => {
 	// excludeFromStream is nullable with no default (see schema.ts) — NULL means "not excluded",
@@ -45,10 +47,16 @@ export const actions: Actions = {
 			return fail(400, { error: 'Bitte wähle mindestens zwei lose Fotos aus.' });
 		}
 
+		const albumTitleFinal = albumTitle || 'Neues Album';
+		const albumId = randomUUID();
+		const albumSlug = await generateAlbumSlug(albumTitleFinal, albumId);
+
 		const [createdAlbum] = await db
 			.insert(album)
 			.values({
-				title: albumTitle || 'Neues Album',
+				id: albumId,
+				slug: albumSlug,
+				title: albumTitleFinal,
 				originPostId: null,
 				authorId: user.id,
 				createdAt: new Date()
@@ -57,7 +65,7 @@ export const actions: Actions = {
 
 		await db.update(photo).set({ albumId: createdAlbum.id }).where(inArray(photo.id, looseIds));
 
-		throw redirect(303, `/albums/${createdAlbum.id}`);
+		throw redirect(303, `/albums/${encodeURIComponent(createdAlbum.slug ?? createdAlbum.id)}`);
 	},
 
 	deletePhoto: async ({ request, locals }) => {

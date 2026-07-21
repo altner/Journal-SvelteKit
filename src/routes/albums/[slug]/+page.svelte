@@ -8,8 +8,10 @@
 
 	let { data }: { data: PageData } = $props();
 
+	const headTitle = $derived(`${data.album.title} · achis.blog`);
+
 	function hrefFor(photoId: string) {
-		return `/albums/${data.album.id}/photo/${photoId}`;
+		return `/albums/${data.album.slug}/photo/${photoId}`;
 	}
 
 	function isPlainClick(e: MouseEvent) {
@@ -74,7 +76,13 @@
 <svelte:window onkeydown={onKeydown} />
 
 <svelte:head>
-	<title>{data.album.title} · achis.blog</title>
+	<title>{headTitle}</title>
+	<link rel="canonical" href={data.canonicalUrl} />
+	<meta property="og:type" content="article" />
+	<meta property="og:title" content={headTitle} />
+	<meta property="og:url" content={data.canonicalUrl} />
+	{#if data.ogImage}<meta property="og:image" content={data.ogImage} />{/if}
+	<meta name="twitter:card" content={data.ogImage ? 'summary_large_image' : 'summary'} />
 </svelte:head>
 
 <div class="page">
@@ -82,12 +90,12 @@
 	<div class="album-header">
 		<h1>{data.album.title}</h1>
 		{#if data.user}
-			<DeleteAlbumButton albumId={data.album.id} afterDelete={() => goto('/albums')} />
+			<DeleteAlbumButton albumSlug={data.album.slug ?? data.album.id} afterDelete={() => goto('/albums')} />
 		{/if}
 	</div>
 
 	{#if data.album.originPostId}
-		<a class="origin" href="/posts/{data.album.originPostId}">Zum Ursprungs-Post</a>
+		<a class="origin" href="/posts/{data.originPostSlug}">Zum Ursprungs-Post</a>
 	{/if}
 
 	{#if data.user}
@@ -149,7 +157,7 @@
 		onClose={close}
 		onPrev={photos.length > 1 ? () => goToIndex(activeIndex - 1) : undefined}
 		onNext={photos.length > 1 ? () => goToIndex(activeIndex + 1) : undefined}
-		deleteAction={data.user ? `/albums/${data.album.id}?/deletePhoto` : undefined}
+		deleteAction={data.user ? `/albums/${data.album.slug}?/deletePhoto` : undefined}
 		onDeleted={handlePhotoDeleted}
 	/>
 {/if}

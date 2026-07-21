@@ -26,6 +26,9 @@ export const session = sqliteTable('session', {
 export const album = sqliteTable('album', {
 	id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
 	title: text('title').notNull(),
+	// URL slug, generated once at creation time and never changed again — see generateAlbumSlug
+	// in albums.ts. Nullable + unique for the same db:push-safety reason as post.slug.
+	slug: text('slug').unique(),
 	// The post that originally created this album
 	originPostId: text('origin_post_id'),
 	authorId: text('author_id')
@@ -40,6 +43,12 @@ export const post = sqliteTable('post', {
 	id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
 	title: text('title'), // optional headline, shown where "username" would be in the FB layout
 	text: text('text'),
+	// URL slug, generated once at creation time (from the title, or the post's own id as fallback
+	// when there's no usable title) and never changed again — see generatePostSlug in posts.ts.
+	// Nullable + unique, not NOT NULL: SQLite allows multiple NULLs under a UNIQUE index, and a
+	// nullable column is the only kind `drizzle-kit push` can ever apply as a lossless ADD COLUMN
+	// (see the isStatusPost incident above).
+	slug: text('slug').unique(),
 	authorId: text('author_id')
 		.notNull()
 		.references(() => user.id, { onDelete: 'cascade' }),

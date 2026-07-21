@@ -15,7 +15,9 @@
 		"db:migrate": "drizzle-kit migrate",
 		"db:studio": "drizzle-kit studio",
 		"create-user": "node --env-file=.env scripts/create-user.mjs",
-		"backfill-post-blocks": "node --env-file=.env scripts/backfill-post-blocks.mjs"
+		"backfill-post-blocks": "node --env-file=.env scripts/backfill-post-blocks.mjs",
+		"backfill-post-slugs": "node --env-file=.env scripts/backfill-post-slugs.mjs",
+		"backfill-album-slugs": "node --env-file=.env scripts/backfill-album-slugs.mjs"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-node": "^5.5.4",

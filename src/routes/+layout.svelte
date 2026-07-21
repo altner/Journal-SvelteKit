@@ -23,6 +23,9 @@
 
 <svelte:head>
 	<link rel="icon" href={favicon} />
+	{#if !page.data.description}
+		<meta name="description" content="my digital corner on the web" />
+	{/if}
 </svelte:head>
 
 <div class="app-shell" class:chrome-free-desktop={isLoginPage}>

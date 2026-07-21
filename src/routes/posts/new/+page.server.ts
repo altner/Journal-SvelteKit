@@ -3,6 +3,8 @@ import type { Actions, PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
 import { album, photo, post } from '$lib/server/db/schema';
 import { setPostTags, parseTagsField } from '$lib/server/tags';
+import { generatePostSlug } from '$lib/server/posts';
+import { generateAlbumSlug } from '$lib/server/albums';
 import {
 	parseBlocksMeta,
 	saveNewPostBlocks,
@@ -10,6 +12,7 @@ import {
 	countNonExcludedNewFiles
 } from '$lib/server/blocks';
 import { eq, inArray } from 'drizzle-orm';
+import { randomUUID } from 'node:crypto';
 
 // Nimmt die optionalen "date"/"time"-Felder (YYYY-MM-DD / HH:MM, z.B. für nachträglich
 // hochgeladene ältere Fotos) und kombiniert sie. Ohne gültiges Datum: jetzt. Mit Datum aber ohne
@@ -83,9 +86,14 @@ export const actions: Actions = {
 			});
 		}
 
+		const id = randomUUID();
+		const slug = await generatePostSlug(title || null, id);
+
 		const [createdPost] = await db
 			.insert(post)
 			.values({
+				id,
+				slug,
 				title: title || null,
 				authorId: user.id,
 				createdAt,
@@ -102,10 +110,16 @@ export const actions: Actions = {
 		const { nonExcludedPhotoIds } = await saveNewPostBlocks(createdPost.id, blocksMeta, data);
 
 		if (saveAsAlbum && nonExcludedPhotoIds.length >= 2) {
+			const albumTitleFinal = albumTitle || title || 'Neues Album';
+			const albumId = randomUUID();
+			const albumSlug = await generateAlbumSlug(albumTitleFinal, albumId);
+
 			const [createdAlbum] = await db
 				.insert(album)
 				.values({
-					title: albumTitle || title || 'Neues Album',
+					id: albumId,
+					slug: albumSlug,
+					title: albumTitleFinal,
 					originPostId: createdPost.id,
 					authorId: user.id,
 					createdAt
