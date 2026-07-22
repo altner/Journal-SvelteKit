@@ -72,9 +72,6 @@
 			<a class="brand" href="/" aria-label="achis.blog – Startseite">📓 achis.blog</a>
 			<div class="topnav-actions">
 			{#if data?.user}
-				{#if !isFeedPage && page.url.pathname !== '/posts/new'}
-					<a class="create-link" href="/posts/new">+ Beitrag</a>
-				{/if}
 				<form method="POST" action="/logout">
 					<input type="hidden" name="redirectTo" value={currentLocation} />
 					<button type="submit" class="logout">Abmelden</button>
@@ -105,9 +102,6 @@
 				</a>
 			{/each}
 			{#if data?.user}
-				{#if !isFeedPage && page.url.pathname !== '/posts/new'}
-					<a class="create-link desktop-create" href="/posts/new">+ Neuer Beitrag</a>
-				{/if}
 				<form method="POST" action="/logout">
 					<input type="hidden" name="redirectTo" value={currentLocation} />
 					<button type="submit" class="logout">Abmelden</button>
@@ -192,7 +186,6 @@
 		font-size: 14px;
 		font-weight: 600;
 	}
-	.create-link,
 	.login-link {
 		display: inline-flex;
 		align-items: center;
@@ -295,15 +288,6 @@
 		.sidebar-nav .brand {
 			font-size: 18px;
 			padding: 0 12px;
-		}
-		.sidebar-nav .desktop-create {
-			margin-top: 8px;
-			background: var(--fb-blue);
-			color: #fff;
-			text-align: center;
-		}
-		.sidebar-nav .desktop-create:hover {
-			background: #166fe0;
 		}
 		.sidebar-nav .desktop-login {
 			margin-top: 8px;

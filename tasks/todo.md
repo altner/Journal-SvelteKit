@@ -1,5 +1,25 @@
 # Todo
 
+## Doppelter „Neuer Beitrag"-Einstieg entfernt — erledigt
+
+Nutzerhinweis: Nav-Link „+ Beitrag"/„+ Neuer Beitrag" und der Feed-eigene Composer sind zwei
+Wege zum selben Ziel — auf Nachfrage per Rückfrage geklärt: kein gleichzeitig sichtbarer Bug
+(die Feed-Seite blendete den Nav-Link schon vorher aus), sondern eine grundsätzliche
+Design-Redundanz. Nutzerentscheidung: Nav-Link ganz entfernen, Feed-Composer wird der einzige
+Einstieg; `/posts/new` bleibt als reiner Direktlink-/No-JS-Fallback bestehen (unverändert
+erreichbar, nur nicht mehr verlinkt).
+
+- [x] `+layout.svelte`: „+ Beitrag"/„+ Neuer Beitrag"-Links aus Kopfzeile und Sidebar entfernt
+      (inkl. der jetzt toten `.create-link`/`.desktop-create`-CSS); `isFeedPage` bleibt für die
+      Timeline-Sidebar erhalten
+- [x] Gleiche Dopplung auch im leeren, eingeloggten Feed gefunden: Composer war schon offen,
+      der leere Zustand verlinkte zusätzlich auf `/posts/new` — Text auf „Nutze den Composer
+      oben" umgestellt, Aktivitäts-Link bleibt (dafür gibt es keinen Feed-Composer)
+- [x] `npm run check` — 0 Fehler
+- [x] Mit temporärem QA-User (danach gelöscht) im Browser geprüft: Desktop-Sidebar und
+      Mobile-Kopfzeile zeigen auf keiner Seite mehr einen Beitrag-Button, Feed-Composer
+      unverändert funktionsfähig, `/posts/new` per Direktaufruf weiterhin erreichbar
+
 ## Usability-Audit: Überschriften auf Inhaltsseiten
 
 - [x] Beitragsdetail und Aktivitätsdetail mit genau einer sichtbaren Hauptüberschrift auszeichnen

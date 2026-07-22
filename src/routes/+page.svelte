@@ -23,7 +23,7 @@
 	{#if data.items.length === 0}
 		<p class="empty">
 			{#if data.user}
-				Noch nichts hier. <a href="/posts/new">Erstelle deinen ersten Beitrag</a> oder
+				Noch nichts hier. Nutze den Composer oben oder
 				<a href="/activities">lade eine Aktivität hoch</a>.
 			{:else}
 				Noch keine Beiträge oder Aktivitäten.
