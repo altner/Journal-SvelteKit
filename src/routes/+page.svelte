@@ -14,24 +14,28 @@
 </svelte:head>
 
 <div class="page feed">
+	<h1 class="sr-only">Feed</h1>
+
 	{#if data.user}
-		<PostComposer />
+		<PostComposer collapsible />
 	{/if}
 
 	{#if data.items.length === 0}
 		<p class="empty">
 			{#if data.user}
-				Noch nichts hier.
+				Noch nichts hier. <a href="/posts/new">Erstelle deinen ersten Beitrag</a> oder
+				<a href="/activities">lade eine Aktivität hoch</a>.
 			{:else}
-				Noch nichts hier. <a href="/posts/new">Leg los</a>.
+				Noch keine Beiträge oder Aktivitäten.
 			{/if}
 		</p>
 	{/if}
 
-	{#each data.items as item (item.kind === 'post' ? item.post.id : item.activity.id)}
+	{#each data.items as item, index (item.kind === 'post' ? item.post.id : item.activity.id)}
 		{#if item.kind === 'post'}
 			<PostCard
 				post={item.post}
+				priority={index === 0}
 				user={data.user}
 				editing={editingId === item.post.id}
 				onEdit={() => (editingId = item.post.id)}
@@ -40,6 +44,7 @@
 		{:else}
 			<ActivityFeedCard
 				activity={item.activity}
+				priority={index === 0}
 				user={data.user}
 				editing={editingId === item.activity.id}
 				onEdit={() => (editingId = item.activity.id)}

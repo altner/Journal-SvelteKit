@@ -1,5 +1,12 @@
 <script lang="ts">
 	import { SOCIAL_PROFILES } from '$lib/consts';
+	import portraitAvif380 from '$lib/assets/me-380.avif';
+	import portraitAvif760 from '$lib/assets/me-760.avif';
+	import portraitWebp380 from '$lib/assets/me-380.webp';
+	import portraitWebp760 from '$lib/assets/me-760.webp';
+
+	const portraitAvifSrcset = `${portraitAvif380} 380w, ${portraitAvif760} 760w`;
+	const portraitWebpSrcset = `${portraitWebp380} 380w, ${portraitWebp760} 760w`;
 </script>
 
 <svelte:head>
@@ -9,13 +16,19 @@
 
 <div class="page">
 	<article class="card about">
-		<img
-			class="portrait"
-			src="/me.jpg"
-			alt="Adrian Altner"
-			width="760"
-			height="1013"
-		/>
+		<picture>
+			<source type="image/avif" srcset={portraitAvifSrcset} sizes="(max-width: 444px) calc(100vw - 80px), 380px" />
+			<img
+				class="portrait"
+				src={portraitWebp380}
+				srcset={portraitWebpSrcset}
+				sizes="(max-width: 444px) calc(100vw - 80px), 380px"
+				alt="Adrian Altner"
+				width="760"
+				height="1013"
+				fetchpriority="high"
+			/>
+		</picture>
 
 		<div class="content">
 			<h1>Über mich</h1>
@@ -50,6 +63,10 @@
 		height: auto;
 		margin: 0 auto;
 		border-radius: 10px;
+	}
+
+	picture {
+		display: block;
 	}
 
 	.content {

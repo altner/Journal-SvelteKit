@@ -6,7 +6,7 @@
 	type EditablePhotoBlock = {
 		id: string;
 		type: 'photos';
-		existingPhotos: { id: string; filename: string }[];
+		existingPhotos: { id: string; filename: string; width?: number | null; height?: number | null }[];
 		excludeFromStream: boolean;
 		fileCount: number;
 	};
@@ -14,7 +14,7 @@
 
 	type InitialBlock =
 		| { id: string; type: 'text'; text: string }
-		| { id: string; type: 'photos'; photos: { id: string; filename: string }[]; excludeFromStream: boolean };
+		| { id: string; type: 'photos'; photos: { id: string; filename: string; width?: number | null; height?: number | null }[]; excludeFromStream: boolean };
 
 	let {
 		initialBlocks,
@@ -93,16 +93,35 @@
 
 <div class="block-editor">
 	{#each blocks as block, i (block.id)}
-		<div class="block">
-			<div class="block-controls">
-				<button type="button" onclick={() => moveUp(i)} disabled={i === 0} aria-label="Nach oben">↑</button>
+		<div
+			class="block"
+			role="group"
+			aria-label={`${block.type === 'text' ? 'Textblock' : 'Fotoblock'} ${i + 1}`}
+		>
+			<div class="block-controls" aria-label="Block anordnen oder entfernen">
+				<span class="block-label" aria-hidden="true">
+					{block.type === 'text' ? 'Textblock' : 'Fotoblock'} {i + 1}
+				</span>
+				<button
+					type="button"
+					onclick={() => moveUp(i)}
+					disabled={i === 0}
+					aria-label={`${block.type === 'text' ? 'Textblock' : 'Fotoblock'} ${i + 1} nach oben`}
+					title="Nach oben"
+				>↑</button>
 				<button
 					type="button"
 					onclick={() => moveDown(i)}
 					disabled={i === blocks.length - 1}
-					aria-label="Nach unten">↓</button
+					aria-label={`${block.type === 'text' ? 'Textblock' : 'Fotoblock'} ${i + 1} nach unten`}
+					title="Nach unten">↓</button
 				>
-				<button type="button" class="remove" onclick={() => removeBlock(i)} aria-label="Block entfernen"
+				<button
+					type="button"
+					class="remove"
+					onclick={() => removeBlock(i)}
+					aria-label={`${block.type === 'text' ? 'Textblock' : 'Fotoblock'} ${i + 1} entfernen`}
+					title="Block entfernen"
 					>×</button
 				>
 			</div>
@@ -112,7 +131,7 @@
 			{:else if block.existingPhotos.length > 0}
 				<div class="existing-photos">
 					{#each block.existingPhotos as p (p.id)}
-						<img src="/uploads/{p.filename}" alt="" />
+						<img src="/uploads/{p.filename}" alt="" width={p.width ?? undefined} height={p.height ?? undefined} loading="lazy" decoding="async" />
 					{/each}
 				</div>
 				{#if block.excludeFromStream}
@@ -138,8 +157,8 @@
 	{/each}
 
 	<div class="add-controls">
-		<button type="button" onclick={addTextBlock}>+ Text</button>
-		<button type="button" onclick={addPhotoBlock}>+ Fotos</button>
+		<button type="button" onclick={addTextBlock} aria-label="Textblock hinzufügen">+ Text</button>
+		<button type="button" onclick={addPhotoBlock} aria-label="Fotoblock hinzufügen">+ Fotos</button>
 	</div>
 </div>
 
@@ -156,23 +175,25 @@
 		display: flex;
 		flex-direction: column;
 		gap: 6px;
-		padding-right: 30px;
 	}
 	.block-controls {
-		position: absolute;
-		top: 0;
-		right: 0;
 		display: flex;
-		flex-direction: column;
-		gap: 2px;
+		align-items: center;
+		gap: 4px;
+	}
+	.block-label {
+		margin-right: auto;
+		font-size: 12px;
+		font-weight: 600;
+		color: var(--fb-gray);
 	}
 	.block-controls button {
 		background: none;
 		border: 1px solid var(--fb-border);
 		border-radius: 4px;
-		width: 24px;
-		height: 22px;
-		font-size: 12px;
+		width: 44px;
+		height: 44px;
+		font-size: 16px;
 		color: var(--fb-gray);
 		cursor: pointer;
 		line-height: 1;
@@ -210,6 +231,7 @@
 		align-items: center;
 		gap: 8px;
 		font-size: 13px;
+		min-height: 44px;
 	}
 	input[type='file'] {
 		font-size: 14px;
@@ -227,6 +249,7 @@
 		background: none;
 		border: 1px solid var(--fb-border);
 		border-radius: 6px;
+		min-height: 44px;
 		padding: 6px 12px;
 		font-size: 13px;
 		font-weight: 600;

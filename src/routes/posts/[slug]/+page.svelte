@@ -6,7 +6,7 @@
 
 	let editing = $state(false);
 
-	const headTitle = $derived(`${data.post.title || 'Post'} · achis.blog`);
+	const headTitle = $derived(`${data.post.title || 'Beitrag'} · achis.blog`);
 </script>
 
 <svelte:head>
@@ -22,10 +22,12 @@
 </svelte:head>
 
 <div class="page">
-	<a class="back" href="/">← Zum Feed</a>
+	<a class="back" href="/posts">← Alle Beiträge</a>
 
 	<PostCard
 		post={data.post}
+		priority
+		headingLevel={1}
 		user={data.user}
 		{editing}
 		onEdit={() => (editing = true)}
@@ -38,7 +40,9 @@
 	.back {
 		font-size: 13px;
 		color: var(--fb-gray);
-		display: inline-block;
+		display: inline-flex;
+		align-items: center;
+		min-height: 44px;
 		margin-bottom: 12px;
 	}
 </style>

@@ -1,10 +1,7 @@
 import type { Handle } from '@sveltejs/kit';
 import { redirect } from '@sveltejs/kit';
 import { getSessionUser } from '$lib/server/auth';
-
-// Feed, Fotos, Alben und /uploads sind öffentlich lesbar. Nur das Erstellen von Posts
-// braucht einen Login.
-const PROTECTED_PREFIXES = ['/posts/new'];
+import { isProtectedPath, safeInternalRedirect } from '$lib/server/redirect';
 
 // Content-Security-Policy wird nicht hier, sondern über `kit.csp` in vite.config.ts gesetzt -
 // SvelteKit generiert dafür einen Nonce für seinen eigenen Inline-Bootstrap-<script> und hängt ihn
@@ -14,14 +11,15 @@ export const handle: Handle = async ({ event, resolve }) => {
 	const user = await getSessionUser(event.cookies);
 	event.locals.user = user;
 
-	const needsAuth = PROTECTED_PREFIXES.some((prefix) => event.url.pathname.startsWith(prefix));
+	const needsAuth = isProtectedPath(event.url.pathname);
 
 	if (!user && needsAuth) {
-		throw redirect(303, `/login?redirectTo=${encodeURIComponent(event.url.pathname)}`);
+		const redirectTo = `${event.url.pathname}${event.url.search}`;
+		throw redirect(303, `/login?redirectTo=${encodeURIComponent(redirectTo)}`);
 	}
 
 	if (user && event.url.pathname === '/login') {
-		throw redirect(303, '/');
+		throw redirect(303, safeInternalRedirect(event.url.searchParams.get('redirectTo')));
 	}
 
 	const response = await resolve(event);

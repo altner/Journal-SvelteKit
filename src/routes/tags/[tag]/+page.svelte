@@ -2,6 +2,7 @@
 	import type { PageData } from './$types';
 	import PostCard from '$lib/components/PostCard.svelte';
 	import ActivityFeedCard from '$lib/components/ActivityFeedCard.svelte';
+	import Pagination from '$lib/components/Pagination.svelte';
 	let { data }: { data: PageData } = $props();
 
 	let editingId = $state<string | null>(null);
@@ -19,10 +20,11 @@
 		<p class="empty">Nichts mit diesem Tag.</p>
 	{/if}
 
-	{#each data.items as item (item.kind === 'post' ? item.post.id : item.activity.id)}
+	{#each data.items as item, index (item.kind === 'post' ? item.post.id : item.activity.id)}
 		{#if item.kind === 'post'}
 			<PostCard
 				post={item.post}
+				priority={index === 0}
 				user={data.user}
 				editing={editingId === item.post.id}
 				onEdit={() => (editingId = item.post.id)}
@@ -31,6 +33,7 @@
 		{:else}
 			<ActivityFeedCard
 				activity={item.activity}
+				priority={index === 0}
 				user={data.user}
 				editing={editingId === item.activity.id}
 				onEdit={() => (editingId = item.activity.id)}
@@ -38,6 +41,8 @@
 			/>
 		{/if}
 	{/each}
+
+	<Pagination pagination={data.pagination} />
 </div>
 
 <style>
@@ -47,6 +52,10 @@
 		gap: 16px;
 	}
 	.back {
+		display: inline-flex;
+		align-items: center;
+		align-self: flex-start;
+		min-height: 44px;
 		font-size: 13px;
 		color: var(--fb-gray);
 	}

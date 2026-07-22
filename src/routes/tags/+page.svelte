@@ -16,7 +16,10 @@
 
 	<div class="tag-list">
 		{#each data.tags as t (t.id)}
-			<a class="tag-pill" href="/tags/{t.slug}">{t.name} <span class="count">{t.count}</span></a>
+			<a class="tag-pill" href="/tags/{t.slug}"
+				>{t.name}
+				<span class="count">{t.count} {t.count === 1 ? 'Eintrag' : 'Einträge'}</span></a
+			>
 		{/each}
 	</div>
 </div>
@@ -41,8 +44,9 @@
 		color: var(--fb-blue);
 		font-size: 14px;
 		font-weight: 600;
-		padding: 6px 14px;
-		border-radius: 16px;
+		min-height: 44px;
+		padding: 8px 14px;
+		border-radius: 22px;
 		text-decoration: none;
 		display: inline-flex;
 		align-items: center;

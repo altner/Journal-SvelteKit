@@ -10,7 +10,7 @@
 		width?: number | null;
 		height?: number | null;
 	};
-	let { photos }: { photos: Photo[] } = $props();
+	let { photos, priority = false }: { photos: Photo[]; priority?: boolean } = $props();
 
 	const shown = $derived(photos.slice(0, 5));
 	const extra = $derived(photos.length - shown.length);
@@ -58,15 +58,38 @@
 		class:portrait={(photos[0].height ?? 0) > (photos[0].width ?? 0)}
 		href={hrefFor(photos[0])}
 		onclick={openPhoto(photos[0])}
+		aria-label={`Foto 1 von ${photos.length} öffnen`}
 		style:--bleed-image={`url('/uploads/${photos[0].filename}')`}
 	>
-		<img class="single" src="/uploads/{photos[0].filename}" alt="" />
+		<img
+			class="single"
+			src="/uploads/{photos[0].filename}"
+			alt=""
+			width={photos[0].width ?? undefined}
+			height={photos[0].height ?? undefined}
+			loading={priority ? 'eager' : 'lazy'}
+			fetchpriority={priority ? 'high' : undefined}
+			decoding="async"
+		/>
 	</a>
 {:else if photos.length > 1}
 	<div class="grid n{shown.length}">
 		{#each shown as photo, i (photo.id)}
-			<a class="tile" href={hrefFor(photo)} onclick={openPhoto(photo)}>
-				<img src="/uploads/{photo.filename}" alt="" />
+			<a
+				class="tile"
+				href={hrefFor(photo)}
+				onclick={openPhoto(photo)}
+				aria-label={`Foto ${i + 1} von ${photos.length} öffnen`}
+			>
+				<img
+					src="/uploads/{photo.filename}"
+					alt=""
+					width={photo.width ?? undefined}
+					height={photo.height ?? undefined}
+					loading={priority && i === 0 ? 'eager' : 'lazy'}
+					fetchpriority={priority && i === 0 ? 'high' : undefined}
+					decoding="async"
+				/>
 				{#if extra > 0 && i === shown.length - 1}
 					<div class="more">+{extra}</div>
 				{/if}

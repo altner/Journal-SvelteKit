@@ -1,5 +1,330 @@
 # Todo
 
+## Usability-Audit: Überschriften auf Inhaltsseiten
+
+- [x] Beitragsdetail und Aktivitätsdetail mit genau einer sichtbaren Hauptüberschrift auszeichnen
+- [x] Karten in Feed, Archiv und Tagansicht als untergeordnete Überschriften strukturieren
+- [x] Sport-Symbol in Überschriften als rein visuelle Ergänzung kennzeichnen
+- [x] Zurück-Links der beiden Detailseiten als 44-Pixel-Touchziele vereinheitlichen
+- [x] Öffentlich und angemeldet im Browser geprüft: Übersicht H1 → Karten-H2, beide Details mit
+      genau einer H1; Aktivitäts-H1 bleibt auch beim Bearbeiten erhalten; Rückwege 44 Pixel hoch;
+      bei 390 Pixeln kein Überlauf
+- [x] Testnutzer und Sitzung entfernt; Check ohne Fehler/Warnungen, Produktions-Build und
+      Diff-Prüfung erfolgreich
+
+## Usability-Audit: Bildladen und Layoutstabilität
+
+- [x] Gespeicherte Fotoabmessungen in Feed, Aktivitäten, Alben, Fotostream und Lightbox ausgeben
+- [x] Nur das erste sichtbare Inhaltsbild priorisieren, nachfolgende Bilder verzögert laden
+- [x] Bilddekodierung vom Hauptthread entkoppeln und Editor-Vorschaubilder ebenfalls stabilisieren
+- [x] Feed, Fotostream, Aktivitätsdetail und Lightbox im Browser geprüft: erstes Foto eager/high,
+      folgende Fotos lazy, alle mit echten Maßen und asynchroner Dekodierung; Album-Markup wird
+      über denselben typgeprüften Galeriepfad erzeugt; mobil bei 390 Pixeln kein Überlauf
+- [x] Keine lokalen Fotos ohne Abmessungen; Check ohne Fehler/Warnungen, Produktions-Build und
+      Diff-Prüfung erfolgreich
+
+## Usability-Audit: Fokus nach Seitenwechseln
+
+- [x] Nach clientseitigen Seitenwechseln den Fokus an den Beginn des neuen Hauptinhalts setzen
+- [x] Direkte Seitenaufrufe und gezielte Sprunglinks nicht durch automatischen Fokus stören
+- [x] Foto-Lightbox-Shallow-Routing und bestehende Fokus-Rückkehr unverändert lassen
+- [x] Direkte Beitragserstellung als fokussierte Aufgabe im Titelfeld beginnen
+- [x] Öffentlich und angemeldet im Browser geprüft: Hauptnavigation und Pagination fokussieren den
+      neuen Hauptinhalt; Login behält den E-Mail-Fokus; direkte Beitragserstellung fokussiert den
+      Titel; Lightbox fokussiert Schließen und gibt den Fokus zum Fotolink zurück; bei 390 Pixeln
+      kein Überlauf
+- [x] Temporäre Paginationseinträge, Testnutzer und Sitzung entfernt; Check ohne
+      Fehler/Warnungen, Produktions-Build und Diff-Prüfung erfolgreich
+
+## Usability-Audit: Entwurfsschutz bei Foto- und Aktivitätsuploads
+
+- [x] Aktivitäts-, Album- und Albumfoto-Formulare bei begonnener Eingabe als geändert erkennen
+- [x] Fotoauswahl zum Album einschließlich optionalem Titel gegen versehentliches Verlassen schützen
+- [x] Abbrechen mit Inhalt bestätigen, unveränderte Formulare weiterhin direkt schließen
+- [x] Erfolgreiches Absenden ohne Warnung erlauben und Zustand vollständig zurücksetzen
+- [x] Eingeloggt im Browser geprüft: unverändertes Albumformular schließt direkt; begonnenes Album
+      bleibt nach abgelehntem Verwerfen samt Titel erhalten und schließt nach Bestätigung;
+      Aktivitätsentwurf bleibt bei abgelehnter Navigation erhalten; mobil bei 390 Pixeln kein
+      Überlauf und Abbrechen 44 Pixel hoch
+- [x] Testnutzer und Sitzung entfernt; Check ohne Fehler/Warnungen, Produktions-Build und
+      Diff-Prüfung erfolgreich
+
+## Usability-Audit: Anmeldung und Sitzung
+
+- [x] E-Mail nach fehlgeschlagener Anmeldung erhalten, Passwort bewusst leeren
+- [x] Nach Fehler das richtige Korrekturfeld fokussieren und Meldung eindeutig verknüpfen
+- [x] Laufende Anmeldung vollständig sperren und verständlich kennzeichnen
+- [x] Unerwartete Anmeldefehler innerhalb der Login-Seite auffangen
+- [x] Ungültige oder verwaiste Sitzungscookies serverseitig entfernen
+- [x] Falsches und korrektes Passwort sowie Rücksprung nach `/photos?view=qa` im Browser geprüft;
+      mobil bei 390 Pixeln kein Überlauf, E-Mail initial fokussiert und Submit 44 Pixel hoch;
+      verwaistes Sitzungscookie zusätzlich per lokaler HTTP-Antwort geprüft
+- [x] Testnutzer und Sitzung entfernt; Check ohne Fehler/Warnungen, Produktions-Build und
+      Diff-Prüfung erfolgreich
+
+## Usability-Audit: Schutz vor Entwurfsverlust
+
+- [x] Begonnene neue Beiträge bei interner Navigation, Zurück und Neuladen schützen
+- [x] Beitrags- und Aktivitätsbearbeitung auf denselben Schutz umstellen
+- [x] Änderungen aus Texteditor, Tags, Dateien und Standort zuverlässig erkennen
+- [x] Erfolgreiches Speichern und unverändertes Verlassen ohne unnötige Warnung ermöglichen
+- [x] Minimieren des Feed-Composers weiterhin ohne Verlust oder Warnung erlauben
+- [x] Interne Navigation, Verbleiben und bewusstes Verwerfen bei neuem Beitrag und
+      Beitragsbearbeitung im Browser geprüft; unveränderte Navigation bleibt promptfrei; bei
+      390 Pixeln kein Überlauf; echter Beitrag unverändert und Testnutzer entfernt
+- [x] Check ohne Fehler/Warnungen, Produktions-Build und Diff-Prüfung erfolgreich
+
+## Usability-Audit: Standortauswahl
+
+- [x] Standortbereich semantisch mit seinem Ein-/Ausklappschalter verknüpfen
+- [x] Kartenbedienung und alternative Standortermittlung verständlich erklären
+- [x] Browser-Standortermittlung gegen Mehrfachauslösung sperren und laufenden Zustand anzeigen
+- [x] Geocoding-Anfragen bei neuer Position oder Entfernen des Standorts zuverlässig abbrechen
+- [x] Lade- und Fehlermeldungen zugänglich ansagen und Fehler fokussieren
+- [x] Erstellung und Bearbeitung mobil/desktop im Browser geprüft: Kartenwahl ermittelt Dresden,
+      Entfernen leert alle Standortfelder dauerhaft; bei 390 Pixeln kein Überlauf und 44-Pixel-Aktion;
+      öffentliche Ansicht bleibt ohne Editor; Testnutzer entfernt, echte Daten unverändert
+- [x] Check ohne Fehler/Warnungen, Produktions-Build und Diff-Prüfung erfolgreich
+
+## Usability-Audit: Erstell- und Uploadfehler
+
+- [x] Beitrag, Aktivität, Album und Fotoauswahl unterscheiden Erfolg, Validierung und Systemfehler
+- [x] Laufende Formulare und ihre Ein-/Ausklappaktionen gegen Doppelaktionen sperren
+- [x] Fehlermeldungen als Live-Meldung ausgeben und fokussieren
+- [x] Nach erfolgreichem Abschluss Fokus und Formularzustand nachvollziehbar zurücksetzen
+- [x] Album-Fotoauswahl nach Erfolg vollständig verlassen und Auswahl leeren
+- [x] Ungültigen GPX-Upload im Browser geprüft: Formular bleibt offen, Fehler wird angesagt und
+      fokussiert; bei 390 Pixeln kein Überlauf; öffentliche Ansicht bleibt ohne Erstellaktion
+- [x] Keine Datei und kein Inhalt durch den Fehlertest angelegt, Testnutzer entfernt; Check ohne
+      Fehler/Warnungen, Produktions-Build und Diff-Prüfung erfolgreich
+
+## Usability-Audit: Bearbeitungsformulare
+
+- [x] Beitrag und Aktivität beim Öffnen direkt in das erste Feld fokussieren
+- [x] Speichern eindeutig als laufenden Zustand anzeigen und Mehrfachsendungen verhindern
+- [x] Server- und unerwartete Fehler zugänglich melden und fokussieren
+- [x] Versehentlichen Abbruch geänderter Formulare bestätigen
+- [x] Nach Speichern oder Abbrechen den Fokus zum sichtbaren Eigentümer-Aktionsmenü zurückgeben
+- [x] Beitrag und Aktivität mobil/desktop im Browser geprüft; bei 390 Pixeln kein Überlauf und
+      beide Abschlussaktionen 44 Pixel hoch; echte Inhalte unverändert und Testnutzer entfernt
+- [x] Check ohne Fehler/Warnungen, Produktions-Build und Diff-Prüfung erfolgreich
+
+## Usability-Audit: Löschaktionen
+
+- [x] Beitrag, Aktivität und Album während des Löschens sperren und eindeutig beschriften
+- [x] Server- und unerwartete Fehler als Live-Meldung ausgeben
+- [x] Abbruch der Bestätigung ohne hängenden Wartezustand sicherstellen
+- [x] Foto-Löschung auf dieselbe Fehlerbehandlung ergänzen
+- [x] Öffentliche/eingeloggte Ansicht sowie Abbruch und Erfolg im Browser geprüft; temporäres Album
+      erfolgreich gelöscht, echte lokale Inhalte wiederhergestellt und sämtliche Testdaten entfernt
+- [x] Check ohne Fehler/Warnungen, Produktions-Build und Diff-Prüfung erfolgreich
+
+## Usability-Audit: Fotos zu Album hinzufügen
+
+- [x] Aufklappschalter und Formular semantisch verknüpfen, Fokus beim Öffnen setzen
+- [x] Dateiauswahl mit verständlicher Anzahl live rückmelden
+- [x] Uploadzustand sperren und Fehler als Live-Meldung ausgeben
+- [x] Nach Erfolg Fokus zum wieder sichtbaren Auslöser zurückführen
+- [x] Zurück-Link auf 44-Pixel-Ziel vereinheitlichen
+- [x] Mobil/desktop sowie öffentlich/eingeloggt mit echtem Test-Upload geprüft; Testfoto,
+      Statusbeitrag, Album und Testnutzer vollständig entfernt
+- [x] Check ohne Fehler/Warnungen, Produktions-Build und Diff-Prüfung erfolgreich
+
+## Usability-Audit: Eigentümer-Aktionsmenüs
+
+- [x] Menü bei Klick außerhalb schließen
+- [x] Escape schließt das Menü und gibt den Fokus an den Auslöser zurück
+- [x] Beim Öffnen eines Menüs andere offene Eigentümer-Menüs schließen
+- [x] Beitrag, Aktivität und temporäres Album mobil/desktop sowie öffentlich/eingeloggt geprüft;
+      Testalbum und Testnutzer entfernt
+- [x] Check ohne Fehler/Warnungen, Produktions-Build und Diff-Prüfung erfolgreich
+
+## Usability-Audit: Aufklappbare Erstellformulare
+
+- [x] Beitrag, Aktivität und Album mit `aria-expanded`/`aria-controls` eindeutig verknüpfen
+- [x] Beim Öffnen den Fokus ins erste Feld und beim Minimieren zurück zum Auslöser führen
+- [x] Minimieren als 44-Pixel-Touchziel ausführen
+- [x] Alle drei Flüsse mobil/desktop und mit Tastatur geprüft; öffentliche Ansicht gegengeprüft;
+      Testnutzer entfernt
+- [x] Check ohne Fehler/Warnungen, Produktions-Build und Diff-Prüfung erfolgreich
+
+## Usability-Audit: Tag-Navigation
+
+- [x] Tag-Trefferseiten in das bestehende Vor/Zurück-Seitenmodell aufnehmen
+- [x] Tag-Links in Übersicht, Beiträgen und Aktivitäten als gut erreichbare Touch-Ziele ausführen
+- [x] Tag-Übersicht mobil/desktop und Trefferseiten mit 21 temporären Einträgen öffentlich geprüft;
+      Testdaten vollständig entfernt
+- [x] Check ohne Fehler/Warnungen, Produktions-Build und Diff-Prüfung erfolgreich
+
+## Usability-Audit: Tag-Eingabe
+
+- [x] TagInput selbst beschriften und interaktive Buttons aus übergeordneten Labels lösen
+- [x] Gesamten Tag-Chip als 44-Pixel-Löschziel mit eindeutigem Namen ausführen
+- [x] Bedienhinweis sowie Live-Rückmeldung für Hinzufügen, Duplikate und Entfernen ergänzen
+- [x] Eingefügte kommagetrennte Werte als mehrere Tags übernehmen
+- [x] Beitragserstellung und Aktivitätsformular mobil/desktop im Browser geprüft; Testnutzer entfernt
+- [x] Check ohne Fehler/Warnungen, Produktions-Build und Diff-Prüfung erfolgreich
+
+## Usability-Audit: Beitragseditor
+
+- [x] Blockaktionen horizontal und mit 44 × 44 Pixel großen Zielen anordnen
+- [x] Jeden Text-/Fotoblock und seine Verschieben-/Entfernen-Aktionen eindeutig nummerieren
+- [x] Textformatierung auf 44-Pixel-Ziele mit Namen, Tooltip und `aria-pressed` umstellen
+- [x] Editor-Ladezustand sperren und das eigentliche Textfeld als „Beitragstext“ benennen
+- [x] Block-hinzufügen-Aktionen und Fotostream-Checkbox auf mindestens 44 Pixel bringen
+- [x] Text-/Fotoblock, Verschieben, nummerierte Namen und gedrückte Formatierung bei 320 Pixeln
+      geprüft; Desktop-Werkzeugleiste bei 1440 Pixeln geprüft; Testnutzer entfernt
+- [x] Check ohne Fehler/Warnungen, Produktions-Build und Diff-Prüfung erfolgreich
+
+## Usability-Audit: Kartenbedienung
+
+- [x] Mobile Leaflet-Zoomtasten auf 44 × 44 Pixel vergrößern
+- [x] Kartenregionen nach Zweck beschriften und rein visuelle Streckenmarker aus der Tab-Reihenfolge nehmen
+- [x] Versehentliches Scrollrad-Zoomen in Feed-, Detail- und Standortkarten verhindern
+- [x] Standortaktionen und Textfelder auf mindestens 44 Pixel Höhe bringen
+- [x] Öffentliche Streckenkarte mobil/desktop sowie eingeloggten Standorteditor bei 390 Pixeln
+      geprüft; Markersemantik, Kartenlabels und reale Controlgrößen bestätigt; Testnutzer entfernt
+- [x] Check ohne Fehler/Warnungen, Produktions-Build und Diff-Prüfung erfolgreich
+
+## Usability-Audit: Touch-Ziele
+
+- [x] Kopfzeile, Sidebar, Foto-Tabs, Zurück-Links und Besitzer-Menü auf 44-Pixel-Ziele umstellen
+- [x] Primäre Album-, Aktivitäts- und Fotoauswahl-Aktionen einschließlich Submit auf 44 Pixel bringen
+- [x] Foto-Tabs mit Navigationsbezeichnung und `aria-current` ergänzen
+- [x] Öffentlich bei 320 Pixeln sowie eingeloggt bei 390 Pixeln vermessen; Album-/Aktivitätsaktion,
+      Kopfzeile, Tabs und Besitzer-Menü mindestens 44 Pixel, untere Navigation 48 Pixel
+- [x] Desktop-Sidebar bei 1440 Pixeln vermessen; temporären Nutzer entfernt; Check ohne
+      Fehler/Warnungen, Produktions-Build und Diff-Prüfung erfolgreich
+
+## Usability-Audit: Pagination
+
+- [x] Gemeinsame Navigation semantisch als „Weitere Seiten“ und Links als Einträge benennen
+- [x] Neuere/ältere Richtung zusätzlich mit `rel="prev"`/`rel="next"` auszeichnen
+- [x] Beide Links auf mindestens 44 Pixel hohe Touch-Ziele vergrößern
+- [x] Erste, mittlere und letzte Seite mit 45 temporären Beiträgen bei 390 Pixeln geprüft;
+      Touch-Ziele jeweils 44 Pixel hoch; alle Testbeiträge anschließend entfernt
+- [x] Check ohne Fehler/Warnungen, Produktions-Build und Diff-Prüfung erfolgreich
+
+## Usability-Audit: Logout-Rückkehr
+
+- [x] Abmelden behält die aktuelle öffentlich lesbare Seite einschließlich Suchparametern bei
+- [x] Externe und nach dem Logout geschützte Ziele serverseitig auf den Feed zurückführen
+- [x] Geschützte Pfaderkennung zwischen Auth-Hook und Logout zentral vereinheitlichen
+- [x] Öffentlichen Rückweg mit Suchparametern und geschützten Fallback bei 390 Pixeln im Browser
+      geprüft; extern manipuliertes Ziel am Endpunkt geprüft; temporären Nutzer entfernt
+- [x] Check ohne Fehler/Warnungen, Produktions-Build und Diff-Prüfung erfolgreich
+
+## Usability-Audit: Login-Rückkehr
+
+- [x] Globale Login-Links merken sich die aktuelle interne Seite einschließlich Suchparametern
+- [x] Rücksprungziel serverseitig strikt auf dieselbe Website begrenzen
+- [x] Sichtbaren „Zurück“-Link und gesperrten Ladezustand während der Anmeldung ergänzen
+- [x] Erfolgreichen Login mit Suchparametern, zugänglichen Fehlerzustand und manipuliertes
+      externes Rücksprungziel bei 390 Pixeln im Browser geprüft; temporären Nutzer entfernt
+- [x] Check ohne Fehler/Warnungen, Produktions-Build und Diff-Prüfung erfolgreich
+
+## Usability-Audit: Mobile Lightbox-Geometrie
+
+- [x] Horizontalen Überlauf gemessen: `100vw` machte den Dialog um die Scrollbarbreite zu groß
+- [x] Dialog und Fotoinhalt an die tatsächlich verfügbare Breite statt an `100vw` binden
+- [x] Schließen- und Löschaktion auf mindestens 44 × 44 Pixel vergrößern
+- [x] Mobile Geometrie bei 390 × 844 und Desktop bei 1440 × 900 im Browser geprüft; kein
+      horizontaler Überlauf mehr; Check, Build und Diff-Prüfung erfolgreich
+
+## Usability-Audit: Foto-Lightbox
+
+- [x] Gemeinsame Dialogsemantik und alle Aufrufkontexte geprüft
+- [x] Aussagekräftigen Bild-Alternativtext und Dateinamen in der Dialogbezeichnung ergänzen
+- [x] Fokus beim Öffnen auf „Schließen“ setzen und beim Schließen zum Auslöser zurückführen
+- [x] Verbliebenes Lösch-Emoji durch ein zentriertes SVG ersetzen; Senden sperren und Fehler ansagen
+- [x] Besitzeraktion der globalen Fotoansicht auch nach Neuladen/direktem Permalink erhalten
+- [x] Shallow-Routing und Fokus-Rückkehr sowie öffentlicher/eingeloggter Direktlink im Browser
+      geprüft; temporären Nutzer entfernt; Check, Build und Diff-Prüfung erfolgreich
+
+## Usability-Audit: Profilbild-Performance
+
+- [x] Live-Auslieferung geprüft: `me.jpg` wird als 173-KB-JPEG ohne `Cache-Control` gesendet
+- [x] Responsive AVIF- und WebP-Varianten in 380 und 760 Pixel Breite erzeugt
+- [x] Varianten über Vite-Imports mit gehashten, langfristig cachebaren URLs einbinden
+- [x] Bildqualität und responsive Auswahl bei 390 Pixeln im Browser geprüft; `npm run check`,
+      Produktions-Build und Diff-Prüfung erfolgreich
+
+## Usability-Audit: Rückmeldung bei Uploads
+
+- [x] Aktivitäts-, Album-, Albumfoto- und Fotoauswahl-Formulare während des Sendens sperren
+- [x] Je Aktion einen eindeutigen laufenden Status direkt im Submit-Button anzeigen
+- [x] Reaktive Zustände mit Check und Build geprüft; Album-Erstellung und anschließendes
+      Foto-Hinzufügen im Browser durchlaufen, sämtliche Testdatensätze und Dateien danach entfernt
+
+## Usability-Audit: öffentliche und eingeloggte Navigation — erste Runde erledigt
+
+- [x] Aktiven Hauptbereich auch auf Detailseiten und bei Alben korrekt markieren
+- [x] Marke als eindeutigen Home-Link ausführen
+- [x] Mobile Navigation vollständig machen, ohne die Kopfzeile zu überladen
+- [x] Login öffentlich auffindbar und „Neuer Beitrag“ eingeloggt global erreichbar machen
+- [x] Öffentlich und mit temporärem lokalem Testnutzer geprüft: Desktop-Navigation, 390-px-Mobilansicht,
+      Feed, Album-Bereich und Aktivitätsdetail; Testnutzer und Session anschließend entfernt
+
+## Usability-Audit: Detailseiten und Erstellen-Aktionen — erledigt
+
+- [x] Beitragsdetail logisch zum Beitragsarchiv zurückführen
+- [x] Albumdetail auf dieselbe proportionale Fotodarstellung wie die Fotoübersicht umstellen
+- [x] Album-Upload für eingeloggte Nutzer einklappbar machen, damit die Fotos im Mittelpunkt stehen
+- [x] Leeres Album mit einem klaren rollenunabhängigen Zustand versehen
+- [x] Login auf Mobil und Desktop als fokussierte Aufgabe ohne Footer/zusätzlichen Scrollbereich gestalten
+- [x] Öffentliche Beitrags-/Album-/Loginzustände und 390-px-Loginansicht im Browser geprüft;
+      eingeloggte Albumsteuerung zusätzlich durch Typprüfung abgedeckt
+
+## Usability-Audit: Tastatur und zugängliche Bildaktionen — erledigt
+
+- [x] Global gut sichtbare `:focus-visible`-Markierung für Links, Buttons und Formfelder ergänzt
+- [x] „Zum Inhalt springen“ als ersten fokussierbaren Link ergänzt; Ziel ist das semantische `<main>`
+- [x] Post- und Aktivitäts-Fotokacheln mit Position und Gesamtzahl zugänglich benannt
+- [x] Globale Fotoübersicht, Albumauswahl und Albumdetail mit benannten Fotoaktionen versehen
+- [x] Im Browser bestätigt: Sprunglink steht vor der Navigation, `<main>` ist semantisch vorhanden,
+      Feed-Fotolinks heißen z. B. „Foto 2 von 13 öffnen“, globale Fotolinks tragen Dateinamen
+
+## Usability-Audit: Besitzeraktionen — erledigt
+
+- [x] Seltene Verwaltungsaktionen aus den dauerhaft sichtbaren Kartenköpfen entfernt
+- [x] Zugängliches Drei-Punkte-Menü als gemeinsame Komponente ergänzt (natives `<summary>`,
+      `aria-expanded`)
+- [x] Beitrag, Aktivität und Album konsistent auf Bearbeiten/Löschen im Menü umgestellt
+- [x] Destruktive Aktionen eindeutig nach ihrem Ziel benannt („Beitrag löschen“ usw.)
+- [x] Menü schließt beim Bearbeiten, bleibt für mögliche Löschfehler aber geöffnet
+- [x] Bei 390 px eingeloggt im Browser geprüft: Menü öffnet, zeigt Bearbeiten/Löschen, startet das
+      Formular ohne überlagerndes Menü; temporären Testnutzer und Session danach entfernt
+
+## Usability-Audit: kompakter Feed-Composer — erledigt
+
+- [x] Feed zunächst auf Inhalte statt auf den vollständigen Editor fokussiert
+- [x] Composer zugänglich öffnen und Fokus ins erste Feld setzen
+- [x] Minimieren ohne Verlust eines begonnenen Entwurfs ermöglichen
+- [x] Doppeltes Absenden verhindern und Fehlerzustände sauber unterscheiden
+- [x] Direkte Seite `/posts/new` unverändert vollständig geöffnet halten
+- [x] Sichtbare Begriffe von „Post“ auf „Beitrag“ vereinheitlicht
+- [x] Eingeloggt bei 390 px und Desktop geprüft: kompakter Start, Fokus auf Titel, Entwurf nach
+      Minimieren/Wiederöffnen erhalten, Direktseite offen; temporären Nutzer danach entfernt
+
+## Usability-Audit: Seitenorientierung und Fehlerwege — erledigt
+
+- [x] Feed mit einer semantischen Hauptüberschrift versehen
+- [x] Leeren Feed öffentlich neutral, eingeloggt handlungsorientiert formuliert
+- [x] Eigene verständliche 404-/Fehlerseite mit sicherem Rückweg ergänzt
+- [x] Mobile Navigationsziele auf echte 48 px Mindesthöhe gebracht
+- [x] Bei 320 px im Browser geprüft: kein horizontaler Overflow, alle fünf Labels lesbar,
+      jedes Ziel exakt 64 × 48 px; 404 mit Titel, Erklärung, Feed-Rückweg und Navigation
+- [x] Check, Build und Diff-Prüfung abgeschlossen
+
+## Usability-Audit: Album-Auswahl aus Fotos
+
+- [x] Unmöglichen Album-Einstieg bei weniger als zwei losen Beitragsfotos entfernen
+- [x] Aktion eindeutig als Zusammenfassen vorhandener loser Fotos benennen
+- [x] Im Auswahlmodus nur tatsächlich auswählbare Fotos zeigen
+- [x] Mindestanzahl und Auswahlfortschritt verständlich kommunizieren
+- [x] Eingeloggt im Browser sowie mit Check und Build verifizieren; temporäre Fotos, Testnutzer
+      und Session anschließend vollständig entfernt
+
 ## Cursor-Pagination nach Aaron-Parecki-Muster — erledigt
 
 - [x] Gemeinsamen stabilen Cursor aus Datum und ID sowie wiederverwendbare Navigation ergänzt

@@ -2,9 +2,11 @@
 	import PhotoGrid from './PhotoGrid.svelte';
 	import DeletePostButton from './DeletePostButton.svelte';
 	import EditPostForm from './EditPostForm.svelte';
+	import OwnerActions from './OwnerActions.svelte';
 	import { renderMarkdownToSafeHtml } from '$lib/markdown';
+	import { tick } from 'svelte';
 
-	type Photo = { id: string; filename: string; postId: string; excludeFromStream: boolean | null };
+	type Photo = { id: string; filename: string; postId: string; excludeFromStream: boolean | null; width: number | null; height: number | null };
 	type Block =
 		| { id: string; type: 'text'; text: string | null; photos: Photo[] }
 		| { id: string; type: 'photos'; text: string | null; photos: Photo[] };
@@ -15,7 +17,9 @@
 		editing = false,
 		onEdit,
 		onEditDone,
-		afterDelete
+		afterDelete,
+		priority = false,
+		headingLevel = 2
 	}: {
 		post: {
 			id: string;
@@ -30,7 +34,7 @@
 				slug: string | null;
 				title: string;
 				originPostId: string | null;
-				photos: { id: string; filename: string; postId: string }[];
+				photos: { id: string; filename: string; postId: string; width: number | null; height: number | null }[];
 			} | null;
 			tags: { id: string; name: string; slug: string }[];
 			latitude: number | null;
@@ -44,6 +48,8 @@
 		onEdit?: () => void;
 		onEditDone?: () => void;
 		afterDelete?: () => void;
+		priority?: boolean;
+		headingLevel?: 1 | 2;
 	} = $props();
 
 	function formatDate(d: Date | string) {
@@ -73,6 +79,10 @@
 	const firstAlbumBlockId = $derived(
 		isOrigin ? post.blocks.find((b) => b.type === 'photos' && !isExcludedBlock(b))?.id ?? null : null
 	);
+	const firstVisiblePhotoBlockId = $derived(
+		post.blocks.find((block) => block.type === 'photos' && block.photos.length > 0)?.id ?? null
+	);
+	let articleElement: HTMLElement | undefined = $state();
 
 	function editableBlocks() {
 		return post.blocks.map((b) =>
@@ -86,13 +96,26 @@
 					}
 		);
 	}
+
+	function startEditing(event: MouseEvent) {
+		(event.currentTarget as HTMLElement).closest('details')?.removeAttribute('open');
+		onEdit?.();
+	}
+
+	async function finishEditing() {
+		onEditDone?.();
+		await tick();
+		articleElement?.querySelector<HTMLElement>('summary[aria-label="Beitragsaktionen"]')?.focus();
+	}
 </script>
 
-<article class="card post" id={post.anchorId ?? undefined}>
+<article bind:this={articleElement} class="card post" id={post.anchorId ?? undefined}>
 	<div class="post-header">
 		<div class="post-meta">
-			{#if !editing}
-				<div class="post-title"><a href="/posts/{post.slug ?? post.id}">{post.title || 'Ohne Titel'}</a></div>
+			{#if headingLevel === 1}
+				<h1 class="post-title detail-title">{post.title || 'Ohne Titel'}</h1>
+			{:else if !editing}
+					<h2 class="post-title"><a href="/posts/{post.slug ?? post.id}">{post.title || 'Ohne Titel'}</a></h2>
 			{/if}
 			<div class="post-sub">
 				<span>{formatDate(post.createdAt)}</span>
@@ -120,12 +143,12 @@
 			{/if}
 		</div>
 		{#if user}
-			<div class="post-actions">
+			<OwnerActions label="Beitragsaktionen">
 				{#if !post.isStatusPost && !editing}
-					<button type="button" class="edit-btn" onclick={() => onEdit?.()}>Bearbeiten</button>
+					<button type="button" class="edit-btn" onclick={startEditing}>Bearbeiten</button>
 				{/if}
 				<DeletePostButton postSlug={post.slug ?? post.id} {afterDelete} />
-			</div>
+			</OwnerActions>
 		{/if}
 	</div>
 
@@ -144,8 +167,8 @@
 						locationName: post.locationName
 					}
 				: null}
-			onSaved={() => onEditDone?.()}
-			onCancel={() => onEditDone?.()}
+			onSaved={finishEditing}
+			onCancel={finishEditing}
 		/>
 	{:else}
 		{#each post.blocks as block (block.id)}
@@ -154,9 +177,9 @@
 					<div class="post-text">{@html renderMarkdownToSafeHtml(block.text)}</div>
 				{/if}
 			{:else if block.id === firstAlbumBlockId}
-				<PhotoGrid photos={post.album?.photos ?? []} />
+				<PhotoGrid photos={post.album?.photos ?? []} priority={priority && block.id === firstVisiblePhotoBlockId} />
 			{:else if !(isOrigin && !isExcludedBlock(block))}
-				<PhotoGrid photos={block.photos} />
+				<PhotoGrid photos={block.photos} priority={priority && block.id === firstVisiblePhotoBlockId} />
 			{/if}
 		{/each}
 	{/if}
@@ -172,27 +195,26 @@
 	.post-meta {
 		flex: 1;
 	}
-	.post-actions {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-	}
 	.edit-btn {
 		background: none;
 		border: none;
 		color: var(--fb-gray);
 		font-size: 13px;
 		cursor: pointer;
-		padding: 0;
+		padding: 8px 10px;
 	}
 	.edit-btn:hover {
 		color: var(--fb-blue);
 		text-decoration: underline;
 	}
 	.post-title {
+		margin: 0;
 		font-weight: 600;
 		font-size: 15px;
 		line-height: 1.3;
+	}
+	.post-title.detail-title {
+		font-size: 20px;
 	}
 	.post-title a {
 		color: inherit;
@@ -254,12 +276,15 @@
 		margin-top: 4px;
 	}
 	.tag-pill {
+		display: inline-flex;
+		align-items: center;
+		min-height: 44px;
 		background: var(--fb-hover);
 		color: var(--fb-blue);
 		font-size: 12px;
 		font-weight: 600;
-		padding: 3px 10px;
-		border-radius: 12px;
+		padding: 6px 12px;
+		border-radius: 22px;
 		text-decoration: none;
 	}
 	.tag-pill:hover {

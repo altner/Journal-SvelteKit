@@ -10,7 +10,7 @@ import { buildPostExcerpt, pickPostOgImage } from '$lib/server/seo';
 
 export const load: PageServerLoad = async ({ params, url }) => {
 	const resolved = await findPostBySlugOrId(params.slug);
-	if (!resolved) throw error(404, 'Post nicht gefunden');
+	if (!resolved) throw error(404, 'Beitrag nicht gefunden');
 	if (resolved.matchedBy === 'id' && resolved.post.slug) {
 		throw redirect(301, `/posts/${encodeURIComponent(resolved.post.slug)}`);
 	}
@@ -31,7 +31,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
 		}
 	});
 
-	if (!found) throw error(404, 'Post nicht gefunden');
+	if (!found) throw error(404, 'Beitrag nicht gefunden');
 
 	const ogImageFilename = pickPostOgImage(found);
 
@@ -49,13 +49,13 @@ export const actions: Actions = {
 		if (!user) return fail(401, { error: 'Bitte melde dich an.' });
 
 		const resolved = await findPostBySlugOrId(params.slug);
-		if (!resolved) throw error(404, 'Post nicht gefunden');
+		if (!resolved) throw error(404, 'Beitrag nicht gefunden');
 
 		const found = await db.query.post.findFirst({
 			where: eq(post.id, resolved.post.id),
 			with: { photos: true, album: true }
 		});
-		if (!found) throw error(404, 'Post nicht gefunden');
+		if (!found) throw error(404, 'Beitrag nicht gefunden');
 
 		await deletePostCascade(found);
 	},
@@ -65,16 +65,16 @@ export const actions: Actions = {
 		if (!user) return fail(401, { error: 'Bitte melde dich an.' });
 
 		const resolved = await findPostBySlugOrId(params.slug);
-		if (!resolved) throw error(404, 'Post nicht gefunden');
+		if (!resolved) throw error(404, 'Beitrag nicht gefunden');
 
 		const found = await db.query.post.findFirst({
 			where: eq(post.id, resolved.post.id),
 			with: { blocks: { with: { photos: true } } }
 		});
-		if (!found) throw error(404, 'Post nicht gefunden');
+		if (!found) throw error(404, 'Beitrag nicht gefunden');
 
 		if (found.isStatusPost) {
-			return fail(403, { error: 'Status-Posts können nicht bearbeitet werden.' });
+			return fail(403, { error: 'Automatische Album-Beiträge können nicht bearbeitet werden.' });
 		}
 
 		const data = await request.formData();

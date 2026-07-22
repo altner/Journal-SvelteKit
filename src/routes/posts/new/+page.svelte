@@ -3,11 +3,11 @@
 </script>
 
 <svelte:head>
-	<title>Neuer Post · achis.blog</title>
+	<title>Neuer Beitrag · achis.blog</title>
 </svelte:head>
 
 <div class="page">
-	<h1>Neuer Post</h1>
+	<h1>Neuer Beitrag</h1>
 	<PostComposer />
 </div>
 

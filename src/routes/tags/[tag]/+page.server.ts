@@ -3,8 +3,9 @@ import type { PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
 import { eq, inArray } from 'drizzle-orm';
 import { post, tag, postTag, activity, activityTag } from '$lib/server/db/schema';
+import { finishPage, PAGE_SIZE, readPageCursor } from '$lib/server/pagination';
 
-export const load: PageServerLoad = async ({ params }) => {
+export const load: PageServerLoad = async ({ params, url }) => {
 	const foundTag = await db.query.tag.findFirst({ where: eq(tag.slug, params.tag) });
 	if (!foundTag) throw error(404, 'Tag nicht gefunden');
 
@@ -51,12 +52,33 @@ export const load: PageServerLoad = async ({ params }) => {
 		| { kind: 'post'; sortDate: Date; post: (typeof posts)[number] }
 		| { kind: 'activity'; sortDate: Date; activity: (typeof activities)[number] };
 
+	const cursor = readPageCursor(url);
+	const itemId = (item: TagItem) =>
+		item.kind === 'post' ? `post:${item.post.id}` : `activity:${item.activity.id}`;
+	const compareNewestFirst = (a: TagItem, b: TagItem) =>
+		b.sortDate.getTime() - a.sortDate.getTime() || itemId(b).localeCompare(itemId(a));
+	const isOnRequestedSide = (item: TagItem) => {
+		if (!cursor) return true;
+		const timeDifference = item.sortDate.getTime() - cursor.date.getTime();
+		return cursor.direction === 'before'
+			? timeDifference < 0 || (timeDifference === 0 && itemId(item) < cursor.id)
+			: timeDifference > 0 || (timeDifference === 0 && itemId(item) > cursor.id);
+	};
+
 	const merged: TagItem[] = [
 		...posts.map((p): TagItem => ({ kind: 'post', sortDate: p.createdAt, post: p })),
 		...activities.map((a): TagItem => ({ kind: 'activity', sortDate: a.startedAt, activity: a }))
-	].sort((a, b) => b.sortDate.getTime() - a.sortDate.getTime());
+	]
+		.filter(isOnRequestedSide)
+		.sort(cursor?.direction === 'after' ? (a, b) => -compareNewestFirst(a, b) : compareNewestFirst)
+		.slice(0, PAGE_SIZE + 1);
 
-	const items = merged.map((item) =>
+	const tagPage = finishPage(
+		merged.map((item) => ({ ...item, id: itemId(item) })),
+		cursor?.direction ?? null
+	);
+
+	const items = tagPage.items.map((item) =>
 		item.kind === 'post'
 			? { kind: 'post' as const, post: { ...item.post, tags: item.post.tags.map((pt) => pt.tag) } }
 			: {
@@ -69,5 +91,5 @@ export const load: PageServerLoad = async ({ params }) => {
 				}
 	);
 
-	return { tag: foundTag, items };
+	return { tag: foundTag, items, pagination: tagPage.pagination };
 };

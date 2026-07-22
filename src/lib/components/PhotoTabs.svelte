@@ -7,9 +7,13 @@
 	];
 </script>
 
-<nav class="tabs">
+<nav class="tabs" aria-label="Fotobereich">
 	{#each tabs as tab (tab.href)}
-		<a href={tab.href} class:active={page.url.pathname === tab.href}>{tab.label}</a>
+		<a
+			href={tab.href}
+			class:active={page.url.pathname === tab.href}
+			aria-current={page.url.pathname === tab.href ? 'page' : undefined}
+		>{tab.label}</a>
 	{/each}
 </nav>
 
@@ -21,7 +25,10 @@
 		margin-bottom: 16px;
 	}
 	.tabs a {
-		padding: 10px 16px;
+		display: inline-flex;
+		align-items: center;
+		min-height: 44px;
+		padding: 8px 16px;
 		font-size: 14px;
 		font-weight: 600;
 		color: var(--fb-gray);

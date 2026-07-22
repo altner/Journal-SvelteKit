@@ -1,16 +1,45 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { beforeNavigate } from '$app/navigation';
 	import type { PageData } from './$types';
 	import ActivityFeedCard from '$lib/components/ActivityFeedCard.svelte';
 	import TagInput from '$lib/components/TagInput.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
+	import { tick } from 'svelte';
 
 	let { data }: { data: PageData } = $props();
 
 	let creating = $state(false);
 	let error = $state<string | undefined>();
 	let hasFile = $state(false);
+	let submitting = $state(false);
+	let dirty = $state(false);
 	let editingId = $state<string | null>(null);
+	let trackFileInput: HTMLInputElement | undefined = $state();
+	let createToggle: HTMLButtonElement | undefined = $state();
+	let errorMessage: HTMLParagraphElement | undefined = $state();
+
+	beforeNavigate(({ cancel, willUnload }) => {
+		if (!dirty || submitting) return;
+		if (willUnload) {
+			cancel();
+			return;
+		}
+		if (!confirm('Deine noch nicht hochgeladene Aktivität verwerfen?')) cancel();
+	});
+
+	async function toggleCreating() {
+		if (creating && dirty && !confirm('Deine noch nicht hochgeladene Aktivität verwerfen?')) return;
+		creating = !creating;
+		if (!creating) {
+			dirty = false;
+			error = undefined;
+		}
+		if (creating) {
+			await tick();
+			trackFileInput?.focus();
+		}
+	}
 
 	function onFileChange(e: Event) {
 		const input = e.currentTarget as HTMLInputElement;
@@ -26,37 +55,63 @@
 	<h1>Aktivitäten</h1>
 
 	{#if data.user}
-		<button type="button" class="toggle-create" onclick={() => (creating = !creating)}>
+		<button
+			bind:this={createToggle}
+			type="button"
+			class="toggle-create"
+			onclick={toggleCreating}
+			aria-expanded={creating}
+			aria-controls="activity-upload-form"
+			disabled={submitting}
+		>
 			{creating ? 'Abbrechen' : '+ Neue Aktivität'}
 		</button>
 
 		{#if creating}
 			<form
+				id="activity-upload-form"
 				method="POST"
 				action="?/upload"
 				enctype="multipart/form-data"
 				class="card upload-form"
+				aria-busy={submitting}
+				oninput={() => (dirty = true)}
+				onchange={() => (dirty = true)}
 				use:enhance={() => {
+					submitting = true;
 					return async ({ result, update, formElement }) => {
 						if (result.type === 'failure') {
 							error = result.data?.error as string | undefined;
+						} else if (result.type === 'error') {
+							error = 'Die Aktivität konnte nicht hochgeladen werden. Bitte versuche es erneut.';
 						} else {
 							error = undefined;
 							formElement.reset();
 							hasFile = false;
+							dirty = false;
 							creating = false;
 						}
 						await update();
+						submitting = false;
+						await tick();
+						if (error) errorMessage?.focus();
+						else createToggle?.focus();
 					};
 				}}
 			>
 				{#if error}
-					<p class="error">{error}</p>
+					<p bind:this={errorMessage} class="error" role="alert" tabindex="-1">{error}</p>
 				{/if}
 
 				<label>
 					GPX-Datei
-					<input type="file" name="trackFile" accept=".gpx" onchange={onFileChange} />
+					<input
+						bind:this={trackFileInput}
+						type="file"
+						name="trackFile"
+						accept=".gpx"
+						onchange={onFileChange}
+					/>
 				</label>
 
 				<label>
@@ -81,12 +136,11 @@
 					</select>
 				</label>
 
-				<label>
-					Tags
-					<TagInput name="tags" />
-				</label>
+				<TagInput name="tags" />
 
-				<button type="submit" disabled={!hasFile}>Aktivität hochladen</button>
+				<button type="submit" disabled={!hasFile || submitting}>
+					{submitting ? 'Aktivität wird hochgeladen…' : 'Aktivität hochladen'}
+				</button>
 			</form>
 		{/if}
 	{/if}
@@ -96,9 +150,10 @@
 	{/if}
 
 	<div class="list">
-		{#each data.activities as a (a.id)}
+		{#each data.activities as a, index (a.id)}
 			<ActivityFeedCard
 				activity={a}
+				priority={index === 0}
 				user={data.user}
 				editing={editingId === a.id}
 				onEdit={() => (editingId = a.id)}
@@ -123,6 +178,7 @@
 		background: none;
 		border: 1px solid var(--fb-border);
 		border-radius: 6px;
+		min-height: 44px;
 		padding: 8px 14px;
 		font-size: 14px;
 		font-weight: 600;
@@ -164,6 +220,7 @@
 		color: #fff;
 		border: none;
 		border-radius: 6px;
+		min-height: 44px;
 		padding: 10px 0;
 		font-size: 15px;
 		font-weight: 600;

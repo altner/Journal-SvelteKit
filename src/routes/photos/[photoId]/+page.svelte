@@ -1,8 +1,9 @@
 <script lang="ts">
-	import type { PageServerData } from './$types';
+	import { goto } from '$app/navigation';
+	import type { PageData } from './$types';
 	import PhotoLightbox from '$lib/components/PhotoLightbox.svelte';
 
-	let { data }: { data: PageServerData } = $props();
+	let { data }: { data: PageData } = $props();
 
 	const photo = $derived(data.photos[data.index]);
 	const headTitle = $derived(`${data.ogTitle} · achis.blog`);
@@ -31,4 +32,6 @@
 		? hrefFor((data.index - 1 + data.photos.length) % data.photos.length)
 		: undefined}
 	nextHref={data.photos.length > 1 ? hrefFor((data.index + 1) % data.photos.length) : undefined}
+	deleteAction={data.user ? '/photos?/deletePhoto' : undefined}
+	onDeleted={() => goto('/photos')}
 />

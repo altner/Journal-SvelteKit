@@ -3,7 +3,9 @@
 	import ActivityPhotoGrid from './ActivityPhotoGrid.svelte';
 	import DeleteActivityButton from './DeleteActivityButton.svelte';
 	import EditActivityForm from './EditActivityForm.svelte';
+	import OwnerActions from './OwnerActions.svelte';
 	import { sportIcon, formatDistance, formatDuration, formatElevation } from '$lib/activityFormat';
+	import { tick } from 'svelte';
 
 	let {
 		activity,
@@ -11,7 +13,8 @@
 		editing = false,
 		onEdit,
 		onEditDone,
-		afterDelete
+		afterDelete,
+		priority = false
 	}: {
 		activity: {
 			id: string;
@@ -24,7 +27,7 @@
 			startedAt: Date | string;
 			trackPoints: [number, number][];
 			tags: { id: string; name: string; slug: string }[];
-			photos: { id: string; filename: string }[];
+			photos: { id: string; filename: string; width: number | null; height: number | null }[];
 			anchorId?: string | null;
 		};
 		user: App.Locals['user'];
@@ -32,9 +35,11 @@
 		onEdit?: () => void;
 		onEditDone?: () => void;
 		afterDelete?: () => void;
+		priority?: boolean;
 	} = $props();
 
 	const elevation = $derived(formatElevation(activity.elevationGainMeters));
+	let articleElement: HTMLElement | undefined = $state();
 
 	function formatDate(d: Date | string) {
 		return new Date(d).toLocaleString('de-DE', {
@@ -45,33 +50,44 @@
 			minute: '2-digit'
 		});
 	}
+
+	function startEditing(event: MouseEvent) {
+		(event.currentTarget as HTMLElement).closest('details')?.removeAttribute('open');
+		onEdit?.();
+	}
+
+	async function finishEditing() {
+		onEditDone?.();
+		await tick();
+		articleElement?.querySelector<HTMLElement>('summary[aria-label="Aktivitätsaktionen"]')?.focus();
+	}
 </script>
 
-<article class="card activity" id={activity.anchorId ?? undefined}>
+<article bind:this={articleElement} class="card activity" id={activity.anchorId ?? undefined}>
 	{#if editing}
 		<EditActivityForm
 			activitySlug={activity.slug ?? activity.id}
 			title={activity.title}
 			sport={activity.sport}
 			tags={activity.tags.map((t) => t.name)}
-			onSaved={() => onEditDone?.()}
-			onCancel={() => onEditDone?.()}
+			onSaved={finishEditing}
+			onCancel={finishEditing}
 		/>
 	{:else}
 		<div class="header">
 			<div>
-				<div class="title">
-					<a href="/activities/{activity.slug ?? activity.id}"
-						>{sportIcon(activity.sport)} {activity.title}</a
-					>
-				</div>
+				<h2 class="title">
+					<a href="/activities/{activity.slug ?? activity.id}">
+						<span aria-hidden="true">{sportIcon(activity.sport)}</span> {activity.title}
+					</a>
+				</h2>
 				<div class="sub">{formatDate(activity.startedAt)}</div>
 			</div>
 			{#if user}
-				<div class="actions">
-					<button type="button" class="edit-btn" onclick={() => onEdit?.()}>Bearbeiten</button>
+				<OwnerActions label="Aktivitätsaktionen">
+					<button type="button" class="edit-btn" onclick={startEditing}>Bearbeiten</button>
 					<DeleteActivityButton activitySlug={activity.slug ?? activity.id} {afterDelete} />
-				</div>
+				</OwnerActions>
 			{/if}
 		</div>
 
@@ -106,7 +122,7 @@
 
 		{#if activity.photos.length > 0}
 			<div class="activity-photos">
-				<ActivityPhotoGrid photos={activity.photos} activitySlug={activity.slug ?? activity.id} />
+				<ActivityPhotoGrid photos={activity.photos} activitySlug={activity.slug ?? activity.id} {priority} />
 			</div>
 		{/if}
 	{/if}
@@ -123,24 +139,20 @@
 		gap: 8px;
 		padding: 12px 16px 0 16px;
 	}
-	.actions {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-	}
 	.edit-btn {
 		background: none;
 		border: none;
 		color: var(--fb-gray);
 		font-size: 13px;
 		cursor: pointer;
-		padding: 0;
+		padding: 8px 10px;
 	}
 	.edit-btn:hover {
 		color: var(--fb-blue);
 		text-decoration: underline;
 	}
 	.title {
+		margin: 0;
 		font-weight: 600;
 		font-size: 15px;
 	}
@@ -163,12 +175,15 @@
 		padding: 8px 16px 0 16px;
 	}
 	.tag-pill {
+		display: inline-flex;
+		align-items: center;
+		min-height: 44px;
 		background: var(--fb-hover);
 		color: var(--fb-blue);
 		font-size: 12px;
 		font-weight: 600;
-		padding: 3px 10px;
-		border-radius: 12px;
+		padding: 6px 12px;
+		border-radius: 22px;
 		text-decoration: none;
 	}
 	.stats {

@@ -14,6 +14,18 @@
 	display: contents;
 }
 
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
 body {
 	margin: 0;
 	background: var(--fb-bg);
@@ -25,6 +37,25 @@ body {
 a {
 	color: inherit;
 	text-decoration: none;
+}
+
+a.back {
+	display: inline-flex;
+	align-items: center;
+	min-height: 44px;
+}
+
+:where(a, button, summary, input, select, textarea):focus-visible {
+	outline: 3px solid color-mix(in srgb, var(--fb-blue) 70%, white);
+	outline-offset: 2px;
+}
+
+@media (max-width: 767px), (pointer: coarse) {
+	.leaflet-touch .leaflet-bar.leaflet-control-zoom a {
+		width: 44px;
+		height: 44px;
+		line-height: 44px;
+	}
 }
 
 .page {

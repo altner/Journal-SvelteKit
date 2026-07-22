@@ -7,14 +7,12 @@
 </script>
 
 {#if pagination.newer || pagination.older}
-	<nav class="pagination" aria-label="Seitennavigation">
+	<nav class="pagination" aria-label="Weitere Seiten">
 		{#if pagination.newer}
-			<a href={pagination.newer}>← Neuere</a>
-		{:else}
-			<span></span>
+			<a href={pagination.newer} rel="prev">← Neuere Einträge</a>
 		{/if}
 		{#if pagination.older}
-			<a href={pagination.older}>Ältere →</a>
+			<a class="older" href={pagination.older} rel="next">Ältere Einträge →</a>
 		{/if}
 	</nav>
 {/if}
@@ -24,12 +22,21 @@
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		min-height: 40px;
 		margin-top: 4px;
+		gap: 12px;
 	}
 
 	.pagination a {
+		display: inline-flex;
+		align-items: center;
+		min-height: 44px;
+		padding: 0 4px;
 		font-size: 14px;
 		font-weight: 600;
+	}
+
+	.pagination .older {
+		margin-left: auto;
+		text-align: right;
 	}
 </style>

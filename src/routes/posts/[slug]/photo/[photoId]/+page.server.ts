@@ -8,7 +8,7 @@ import { buildPostExcerpt } from '$lib/server/seo';
 
 export const load: PageServerLoad = async ({ params, url }) => {
 	const resolved = await findPostBySlugOrId(params.slug);
-	if (!resolved) throw error(404, 'Post nicht gefunden');
+	if (!resolved) throw error(404, 'Beitrag nicht gefunden');
 	if (resolved.matchedBy === 'id' && resolved.post.slug) {
 		throw redirect(301, `/posts/${encodeURIComponent(resolved.post.slug)}/photo/${params.photoId}`);
 	}
@@ -21,7 +21,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
 		}
 	});
 
-	if (!found) throw error(404, 'Post nicht gefunden');
+	if (!found) throw error(404, 'Beitrag nicht gefunden');
 
 	const index = found.photos.findIndex((p) => p.id === params.photoId);
 	if (index === -1) throw error(404, 'Foto nicht gefunden');

@@ -65,3 +65,20 @@ Hauptspalte plus rechte Leiste wäre seine optische Mitte gegenüber der gesamte
 
 - Handlungsaufforderungen zum Erstellen oder Hochladen nur eingeloggten Nutzern zeigen. Öffentliche
   leere Übersichten bleiben neutral und beschreiben lediglich, dass noch keine Inhalte vorhanden sind.
+
+## Statische Inhaltsbilder
+
+- Ein unverändert aus `static/` geladenes Inhaltsbild erhält in der aktuellen Produktion keinen
+  `Cache-Control`-Header. Für sichtbare Seitenbilder responsive AVIF-/WebP-Varianten über einen
+  Vite-Import einbinden: Das reduziert die erste Übertragung und erzeugt gehashte, langfristig
+  cachebare Build-URLs. Das Original in `static/` kann als Quelldatei erhalten bleiben.
+
+## Bestätigung destruktiver Aktionen
+
+- Eine Löschbestätigung nicht auf einen nativen `onsubmit`-Handler neben SvelteKits
+  `use:enhance` verteilen: Der erweiterte Submit-Ablauf kann bereits starten, obwohl der andere
+  Handler das Ereignis abbricht. Die Bestätigung gehört direkt in den `enhance`-Callback und muss
+  dort mit `cancel()` stoppen.
+- Bei einer zweistufigen Inline-Bestätigung ist der erste Auslöser immer `type="button"`. Nur der
+  ausdrücklich bestätigende zweite Button darf das Formular absenden; so kann die Löschung auch
+  vor der Hydrierung nicht versehentlich ohne Bestätigung ausgelöst werden.

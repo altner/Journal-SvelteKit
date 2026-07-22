@@ -6,10 +6,13 @@
 	import DeleteActivityButton from '$lib/components/DeleteActivityButton.svelte';
 	import EditActivityForm from '$lib/components/EditActivityForm.svelte';
 	import { sportIcon, formatDistance, formatDuration, formatElevation } from '$lib/activityFormat';
+	import OwnerActions from '$lib/components/OwnerActions.svelte';
+	import { tick } from 'svelte';
 
 	let { data }: { data: PageData } = $props();
 
 	let editing = $state(false);
+	let articleElement: HTMLElement | undefined = $state();
 
 	const headTitle = $derived(`${data.activity.title} · achis.blog`);
 	const elevation = $derived(formatElevation(data.activity.elevationGainMeters));
@@ -22,6 +25,17 @@
 			hour: '2-digit',
 			minute: '2-digit'
 		});
+	}
+
+	function startEditing(event: MouseEvent) {
+		(event.currentTarget as HTMLElement).closest('details')?.removeAttribute('open');
+		editing = true;
+	}
+
+	async function finishEditing() {
+		editing = false;
+		await tick();
+		articleElement?.querySelector<HTMLElement>('summary[aria-label="Aktivitätsaktionen"]')?.focus();
 	}
 </script>
 
@@ -39,32 +53,33 @@
 <div class="page">
 	<a class="back" href="/activities">← Alle Aktivitäten</a>
 
-	<article class="card">
+	<article bind:this={articleElement} class="card">
 		{#if editing}
+			<h1 class="title edit-title"><span aria-hidden="true">{sportIcon(data.activity.sport)}</span> {data.activity.title}</h1>
 			<EditActivityForm
 				activitySlug={data.activity.slug ?? data.activity.id}
 				title={data.activity.title}
 				sport={data.activity.sport}
 				tags={data.activity.tags.map((t) => t.name)}
-				onSaved={() => (editing = false)}
-				onCancel={() => (editing = false)}
+				onSaved={finishEditing}
+				onCancel={finishEditing}
 			/>
 		{:else}
 			<div class="header">
 				<div>
-					<div class="title">{sportIcon(data.activity.sport)} {data.activity.title}</div>
+					<h1 class="title"><span aria-hidden="true">{sportIcon(data.activity.sport)}</span> {data.activity.title}</h1>
 					<div class="sub">{formatDate(data.activity.startedAt)}</div>
 				</div>
 				{#if data.user}
-					<div class="actions">
-						<button type="button" class="edit-btn" onclick={() => (editing = true)}
+					<OwnerActions label="Aktivitätsaktionen">
+						<button type="button" class="edit-btn" onclick={startEditing}
 							>Bearbeiten</button
 						>
 						<DeleteActivityButton
 							activitySlug={data.activity.slug ?? data.activity.id}
 							afterDelete={() => goto('/activities')}
 						/>
-					</div>
+					</OwnerActions>
 				{/if}
 			</div>
 
@@ -102,6 +117,7 @@
 					<ActivityPhotoGrid
 						photos={data.activity.photos}
 						activitySlug={data.activity.slug ?? data.activity.id}
+						priority
 					/>
 				</div>
 			{/if}
@@ -116,7 +132,9 @@
 	.back {
 		font-size: 13px;
 		color: var(--fb-gray);
-		display: inline-block;
+		display: inline-flex;
+		align-items: center;
+		min-height: 44px;
 		margin-bottom: 12px;
 	}
 	.header {
@@ -126,26 +144,25 @@
 		gap: 8px;
 		padding: 16px 16px 0 16px;
 	}
-	.actions {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-	}
 	.edit-btn {
 		background: none;
 		border: none;
 		color: var(--fb-gray);
 		font-size: 13px;
 		cursor: pointer;
-		padding: 0;
+		padding: 8px 10px;
 	}
 	.edit-btn:hover {
 		color: var(--fb-blue);
 		text-decoration: underline;
 	}
 	.title {
+		margin: 0;
 		font-weight: 600;
-		font-size: 17px;
+		font-size: 20px;
+	}
+	.edit-title {
+		padding: 16px 16px 0;
 	}
 	.sub {
 		font-size: 13px;
@@ -159,12 +176,15 @@
 		padding: 8px 16px 0 16px;
 	}
 	.tag-pill {
+		display: inline-flex;
+		align-items: center;
+		min-height: 44px;
 		background: var(--fb-hover);
 		color: var(--fb-blue);
 		font-size: 12px;
 		font-weight: 600;
-		padding: 3px 10px;
-		border-radius: 12px;
+		padding: 6px 12px;
+		border-radius: 22px;
 		text-decoration: none;
 	}
 	.stats {

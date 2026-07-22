@@ -20,7 +20,7 @@
 			shadowUrl: (await import('leaflet/dist/images/marker-shadow.png?url')).default
 		});
 
-		map = L.map(mapContainer);
+		map = L.map(mapContainer, { scrollWheelZoom: false });
 		L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
 			maxZoom: 19,
 			attribution:
@@ -29,11 +29,15 @@
 
 		if (points.length === 1) {
 			map.setView(points[0], 15);
-			L.marker(points[0]).addTo(map);
+			L.marker(points[0], { interactive: false, keyboard: false, alt: 'Streckenpunkt' }).addTo(map);
 		} else {
 			const line = L.polyline(points, { color: '#1877f2', weight: 4 }).addTo(map);
-			L.marker(points[0]).addTo(map);
-			L.marker(points[points.length - 1]).addTo(map);
+			L.marker(points[0], { interactive: false, keyboard: false, alt: 'Startpunkt' }).addTo(map);
+			L.marker(points[points.length - 1], {
+				interactive: false,
+				keyboard: false,
+				alt: 'Endpunkt'
+			}).addTo(map);
 			map.fitBounds(line.getBounds(), { padding: [20, 20] });
 		}
 	}
@@ -44,7 +48,7 @@
 	});
 </script>
 
-<div class="track-map" bind:this={mapContainer}></div>
+<div class="track-map" bind:this={mapContainer} aria-label="Interaktive Streckenkarte"></div>
 
 <style>
 	.track-map {

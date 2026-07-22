@@ -63,7 +63,10 @@ export async function getSessionUser(cookies: Cookies) {
 		.where(eq(session.id, sessionId));
 
 	const row = rows[0];
-	if (!row) return null;
+	if (!row) {
+		cookies.delete(SESSION_COOKIE, { path: '/' });
+		return null;
+	}
 
 	if (row.expiresAt.getTime() < Date.now()) {
 		await db.delete(session).where(eq(session.id, sessionId));

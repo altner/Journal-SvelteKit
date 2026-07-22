@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { beforeNavigate } from '$app/navigation';
 	import TagInput from './TagInput.svelte';
 	import LocationPicker from './LocationPicker.svelte';
 	import BlockEditor from './BlockEditor.svelte';
+	import { onMount, tick } from 'svelte';
 
 	let {
 		postSlug,
@@ -37,6 +39,27 @@
 	} = $props();
 
 	let error = $state<string | undefined>();
+	let submitting = $state(false);
+	let dirty = $state(false);
+	let titleInput: HTMLInputElement | undefined = $state();
+	let errorMessage: HTMLParagraphElement | undefined = $state();
+
+	onMount(() => titleInput?.focus());
+
+	beforeNavigate(({ cancel, willUnload }) => {
+		if (!dirty || submitting) return;
+		if (willUnload) {
+			cancel();
+			return;
+		}
+		if (!confirm('Ungespeicherte Änderungen verwerfen?')) cancel();
+	});
+
+	function cancelEditing() {
+		if (dirty && !confirm('Ungespeicherte Änderungen verwerfen?')) return;
+		dirty = false;
+		onCancel?.();
+	}
 </script>
 
 <form
@@ -44,37 +67,50 @@
 	action="/posts/{postSlug}?/edit"
 	enctype="multipart/form-data"
 	class="edit-form"
+	aria-busy={submitting}
+	oninput={() => (dirty = true)}
+	onchange={() => (dirty = true)}
 	use:enhance={() => {
+		submitting = true;
 		return async ({ result, update }) => {
 			if (result.type === 'failure') {
 				error = result.data?.error as string | undefined;
+				submitting = false;
+				await tick();
+				errorMessage?.focus();
+				return;
+			}
+			if (result.type === 'error') {
+				error = 'Der Beitrag konnte nicht gespeichert werden. Bitte versuche es erneut.';
+				submitting = false;
+				await tick();
+				errorMessage?.focus();
 				return;
 			}
 			error = undefined;
+			dirty = false;
 			await update();
+			submitting = false;
 			onSaved?.();
 		};
 	}}
 >
-	{#if error}<p class="error">{error}</p>{/if}
+	{#if error}<p bind:this={errorMessage} class="error" role="alert" tabindex="-1">{error}</p>{/if}
 
 	<label>
 		Titel (optional)
-		<input type="text" name="title" value={title ?? ''} placeholder="Worum geht's?" />
+		<input bind:this={titleInput} type="text" name="title" value={title ?? ''} placeholder="Worum geht's?" />
 	</label>
 
 	<BlockEditor initialBlocks={blocks} />
 
-	<label>
-		Tags
-		<TagInput name="tags" initialTags={tags} />
-	</label>
+	<TagInput name="tags" initialTags={tags} />
 
-	<LocationPicker initialLocation={location} />
+	<LocationPicker initialLocation={location} onChange={() => (dirty = true)} />
 
 	<div class="actions">
-		<button type="submit">Speichern</button>
-		<button type="button" class="cancel" onclick={() => onCancel?.()}>Abbrechen</button>
+		<button type="submit" disabled={submitting}>{submitting ? 'Wird gespeichert…' : 'Speichern'}</button>
+		<button type="button" class="cancel" disabled={submitting} onclick={cancelEditing}>Abbrechen</button>
 	</div>
 </form>
 
@@ -107,10 +143,15 @@
 	button {
 		border: none;
 		border-radius: 6px;
-		padding: 6px 14px;
+		min-height: 44px;
+		padding: 8px 14px;
 		font-size: 13px;
 		font-weight: 600;
 		cursor: pointer;
+	}
+	button:disabled {
+		cursor: wait;
+		opacity: 0.65;
 	}
 	button[type='submit'] {
 		background: var(--fb-blue);

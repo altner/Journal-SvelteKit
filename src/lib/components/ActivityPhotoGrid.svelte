@@ -3,8 +3,8 @@
 	import { page } from '$app/state';
 	import PhotoLightbox from './PhotoLightbox.svelte';
 
-	type Photo = { id: string; filename: string };
-	let { photos, activitySlug }: { photos: Photo[]; activitySlug: string } = $props();
+	type Photo = { id: string; filename: string; originalName?: string | null; width?: number | null; height?: number | null };
+	let { photos, activitySlug, priority = false }: { photos: Photo[]; activitySlug: string; priority?: boolean } = $props();
 
 	const shown = $derived(photos.slice(0, 5));
 	const extra = $derived(photos.length - shown.length);
@@ -46,14 +46,23 @@
 </script>
 
 {#if photos.length === 1}
-	<a class="single" href={hrefFor(photos[0])} onclick={openPhoto(photos[0])}>
-		<img src="/uploads/{photos[0].filename}" alt="" />
+	<a
+		class="single"
+		href={hrefFor(photos[0])}
+		onclick={openPhoto(photos[0])}
+		aria-label="Foto 1 von 1 öffnen"
+	>
+		<img src="/uploads/{photos[0].filename}" alt="" width={photos[0].width ?? undefined} height={photos[0].height ?? undefined} loading={priority ? 'eager' : 'lazy'} fetchpriority={priority ? 'high' : undefined} decoding="async" />
 	</a>
 {:else if photos.length > 1}
 	<div class="grid count-{shown.length}">
 		{#each shown as photo, index (photo.id)}
-			<a href={hrefFor(photo)} onclick={openPhoto(photo)}>
-				<img src="/uploads/{photo.filename}" alt="" />
+			<a
+				href={hrefFor(photo)}
+				onclick={openPhoto(photo)}
+				aria-label={`Foto ${index + 1} von ${photos.length} öffnen`}
+			>
+				<img src="/uploads/{photo.filename}" alt="" width={photo.width ?? undefined} height={photo.height ?? undefined} loading={priority && index === 0 ? 'eager' : 'lazy'} fetchpriority={priority && index === 0 ? 'high' : undefined} decoding="async" />
 				{#if extra > 0 && index === shown.length - 1}<span class="more">+{extra}</span>{/if}
 			</a>
 		{/each}

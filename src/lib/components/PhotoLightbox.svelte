@@ -2,7 +2,7 @@
 	import { enhance } from '$app/forms';
 	import { onMount, tick } from 'svelte';
 
-	type Photo = { id: string; filename: string };
+	type Photo = { id: string; filename: string; originalName?: string | null; width?: number | null; height?: number | null };
 
 	// Prev/next/close are always real <a href> links (deep-linkable, work without JS).
 	// When a callback is given, a plain click intercepts navigation and runs it instead
@@ -32,7 +32,9 @@
 	} = $props();
 
 	let deleteError = $state<string | undefined>();
+	let deleting = $state(false);
 	let dialog: HTMLDialogElement;
+	let closeLink: HTMLAnchorElement;
 	let image: HTMLImageElement;
 	let animating = false;
 	let dragStartX: number | null = null;
@@ -42,17 +44,27 @@
 	const SWIPE_THRESHOLD = 60;
 
 	onMount(() => {
+		const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+		// Pointer activation does not focus links consistently in every browser. The shallow-routed
+		// background still contains the photo link whose href is now the current pathname, so use it
+		// as the reliable return target when the active element is only <body>.
+		const opener = Array.from(document.querySelectorAll<HTMLAnchorElement>('a')).find(
+			(link) => !dialog.contains(link) && link.getAttribute('href') === window.location.pathname
+		);
+		const returnFocus = activeElement && activeElement !== document.body ? activeElement : opener;
 		// `open` keeps the progressive-enhancement fallback visible without JS. Upgrade it to a
 		// modal dialog once hydrated, matching the Astro component.
 		if (dialog.open) dialog.close();
 		dialog.showModal();
-	});
+		closeLink.focus();
 
-	function onDeleteSubmit(e: SubmitEvent) {
-		if (!confirm('Dieses Foto wirklich löschen?')) {
-			e.preventDefault();
-		}
-	}
+		return () => {
+			// Let the history-backed background finish becoming current before returning focus.
+			setTimeout(() => {
+				if (returnFocus?.isConnected) returnFocus.focus();
+			}, 0);
+		};
+	});
 
 	function isPlainClick(e: MouseEvent) {
 		return e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey;
@@ -182,8 +194,15 @@
 
 <svelte:window onkeydown={onWindowKeydown} />
 
-<dialog bind:this={dialog} open class="lightbox" aria-label="Fotoansicht" onclick={onBackdropClick} oncancel={onCancel}>
-	<a class="close" href={closeHref} onclick={intercept(onClose)} aria-label="Schließen">
+<dialog
+	bind:this={dialog}
+	open
+	class="lightbox"
+	aria-label={photo.originalName ? `Fotoansicht: ${photo.originalName}` : 'Fotoansicht'}
+	onclick={onBackdropClick}
+	oncancel={onCancel}
+>
+	<a bind:this={closeLink} class="close" href={closeHref} onclick={intercept(onClose)} aria-label="Schließen">
 		<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6 L18 18 M18 6 L6 18" /></svg>
 	</a>
 
@@ -192,12 +211,22 @@
 			method="POST"
 			action={deleteAction}
 			class="delete-form"
-			onsubmit={onDeleteSubmit}
-			use:enhance={() => {
+			use:enhance={({ cancel }) => {
+				if (!confirm('Dieses Foto wirklich löschen?')) {
+					cancel();
+					return;
+				}
+				deleting = true;
 				return async ({ result, update }) => {
 					if (result.type === 'failure') {
 						deleteError = result.data?.error as string | undefined;
+						deleting = false;
 						await update();
+						return;
+					}
+					if (result.type === 'error') {
+						deleteError = 'Das Foto konnte nicht gelöscht werden. Bitte versuche es erneut.';
+						deleting = false;
 						return;
 					}
 					deleteError = undefined;
@@ -205,14 +234,24 @@
 						await onDeleted();
 					} else {
 						await update();
+						deleting = false;
 					}
 				};
 			}}
 		>
 			<input type="hidden" name="photoId" value={photo.id} />
-			<button type="submit" class="delete" aria-label="Foto löschen">🗑</button>
+			<button
+				type="submit"
+				class="delete"
+				disabled={deleting}
+				aria-label={deleting ? 'Foto wird gelöscht' : 'Foto löschen'}
+			>
+				<svg viewBox="0 0 24 24" aria-hidden="true">
+					<path d="M4 7 H20 M9 7 V4 H15 V7 M7 7 L8 20 H16 L17 7 M10 11 V16 M14 11 V16" />
+				</svg>
+			</button>
 		</form>
-		{#if deleteError}<span class="delete-error">{deleteError}</span>{/if}
+		{#if deleteError}<span class="delete-error" role="alert">{deleteError}</span>{/if}
 	{/if}
 
 	{#if prevHref}
@@ -222,7 +261,7 @@
 	{/if}
 
 	<div class="photo-content" class:with-origins={origins.length > 0}>
-		<img bind:this={image} class="full" src="/uploads/{photo.filename}" alt="" draggable="false" onpointerdown={onPointerDown} onpointermove={onPointerMove} onpointerup={endDrag} onpointercancel={endDrag} />
+		<img bind:this={image} class="full" src="/uploads/{photo.filename}" alt={photo.originalName ?? 'Geöffnetes Foto'} width={photo.width ?? undefined} height={photo.height ?? undefined} fetchpriority="high" decoding="async" draggable="false" onpointerdown={onPointerDown} onpointermove={onPointerMove} onpointerup={endDrag} onpointercancel={endDrag} />
 		{#if origins.length > 0}
 			<div class="origins">
 				{#each origins as origin, index (origin.href)}
@@ -248,11 +287,12 @@
 	.lightbox {
 		border: 0;
 		padding: 0;
-		width: 100vw;
-		height: 100vh;
-		max-width: 100vw;
-		max-height: 100vh;
+		width: 100%;
+		height: 100%;
+		max-width: 100%;
+		max-height: 100%;
 		margin: 0;
+		box-sizing: border-box;
 		background: rgba(0, 0, 0, 0.92);
 		color: #fff;
 		overflow: hidden;
@@ -268,7 +308,7 @@
 		place-items: center;
 	}
 	.full {
-		max-width: calc(100vw - 1.5rem);
+		max-width: 100%;
 		max-height: calc(100vh - 1.5rem);
 		object-fit: contain;
 		display: block;
@@ -280,7 +320,7 @@
 		transition: transform 220ms ease;
 	}
 	.photo-content {
-		max-width: calc(100vw - 1.5rem);
+		max-width: calc(100% - 1.5rem);
 		display: flex;
 		flex-direction: column;
 		align-items: stretch;
@@ -340,10 +380,10 @@
 		background: rgba(0, 0, 0, 0.8);
 	}
 	.close {
-		top: 1rem;
-		right: 1rem;
-		width: 2.5rem;
-		height: 2.5rem;
+		top: 0.75rem;
+		right: 0.75rem;
+		width: 2.75rem;
+		height: 2.75rem;
 	}
 	.close svg {
 		width: 1.25rem;
@@ -360,7 +400,7 @@
 	}
 	.delete-form {
 		position: absolute;
-		top: 16px;
+		top: 12px;
 		right: 64px;
 	}
 	.delete {
@@ -373,12 +413,25 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		width: 40px;
-		height: 40px;
-		font-size: 16px;
+		width: 44px;
+		height: 44px;
+	}
+	.delete svg {
+		display: block;
+		width: 1.25rem;
+		height: 1.25rem;
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 1.8;
+		stroke-linecap: round;
+		stroke-linejoin: round;
 	}
 	.delete:hover {
 		background: rgba(255, 255, 255, 0.3);
+	}
+	.delete:disabled {
+		cursor: wait;
+		opacity: 0.6;
 	}
 	.delete-error {
 		position: absolute;
@@ -408,7 +461,7 @@
 	}
 	@media (min-width: 1024px) {
 		.delete-form {
-			top: 1rem;
+			top: 0.75rem;
 			right: 4rem;
 		}
 	}

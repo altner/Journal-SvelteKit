@@ -18,9 +18,10 @@
 		<p class="empty">Noch keine Beiträge.</p>
 	{/if}
 
-	{#each data.posts as p (p.id)}
+	{#each data.posts as p, index (p.id)}
 		<PostCard
 			post={p}
+			priority={index === 0}
 			user={data.user}
 			editing={editingId === p.id}
 			onEdit={() => (editingId = p.id)}
