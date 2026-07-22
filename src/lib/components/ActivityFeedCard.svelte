@@ -5,6 +5,7 @@
 	import EditActivityForm from './EditActivityForm.svelte';
 	import OwnerActions from './OwnerActions.svelte';
 	import { sportIcon, formatDistance, formatDuration, formatElevation } from '$lib/activityFormat';
+	import { formatWeatherSummary } from '$lib/weather';
 	import { tick } from 'svelte';
 
 	let {
@@ -24,6 +25,10 @@
 			distanceMeters: number;
 			durationSeconds: number;
 			elevationGainMeters: number | null;
+			weatherTempC: number | null;
+			weatherCode: number | null;
+			weatherWindKph: number | null;
+			weatherPrecipitationMm: number | null;
 			startedAt: Date | string;
 			trackPoints: [number, number][];
 			tags: { id: string; name: string; slug: string }[];
@@ -39,6 +44,7 @@
 	} = $props();
 
 	const elevation = $derived(formatElevation(activity.elevationGainMeters));
+	const weather = $derived(formatWeatherSummary(activity));
 	let articleElement: HTMLElement | undefined = $state();
 
 	function formatDate(d: Date | string) {
@@ -82,6 +88,7 @@
 					</a>
 				</h2>
 				<div class="sub">{formatDate(activity.startedAt)}</div>
+				{#if weather}<div class="weather">{weather}</div>{/if}
 			</div>
 			{#if user}
 				<OwnerActions label="Aktivitätsaktionen">
@@ -164,6 +171,11 @@
 		text-decoration: underline;
 	}
 	.sub {
+		font-size: 13px;
+		color: var(--fb-gray);
+		margin-top: 2px;
+	}
+	.weather {
 		font-size: 13px;
 		color: var(--fb-gray);
 		margin-top: 2px;

@@ -6,6 +6,7 @@
 	import DeleteActivityButton from '$lib/components/DeleteActivityButton.svelte';
 	import EditActivityForm from '$lib/components/EditActivityForm.svelte';
 	import { sportIcon, formatDistance, formatDuration, formatElevation } from '$lib/activityFormat';
+	import { formatWeatherSummary } from '$lib/weather';
 	import OwnerActions from '$lib/components/OwnerActions.svelte';
 	import { tick } from 'svelte';
 
@@ -16,6 +17,7 @@
 
 	const headTitle = $derived(`${data.activity.title} · achis.blog`);
 	const elevation = $derived(formatElevation(data.activity.elevationGainMeters));
+	const weather = $derived(formatWeatherSummary(data.activity));
 
 	function formatDate(d: Date | string) {
 		return new Date(d).toLocaleString('de-DE', {
@@ -69,6 +71,7 @@
 				<div>
 					<h1 class="title"><span aria-hidden="true">{sportIcon(data.activity.sport)}</span> {data.activity.title}</h1>
 					<div class="sub">{formatDate(data.activity.startedAt)}</div>
+					{#if weather}<div class="weather">{weather}</div>{/if}
 				</div>
 				{#if data.user}
 					<OwnerActions label="Aktivitätsaktionen">
@@ -165,6 +168,11 @@
 		padding: 16px 16px 0;
 	}
 	.sub {
+		font-size: 13px;
+		color: var(--fb-gray);
+		margin-top: 2px;
+	}
+	.weather {
 		font-size: 13px;
 		color: var(--fb-gray);
 		margin-top: 2px;

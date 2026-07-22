@@ -5,6 +5,7 @@ import { and, asc, desc, eq, gt, lt, or } from 'drizzle-orm';
 import { activity, activityPhoto, activityTag } from '$lib/server/db/schema';
 import { deleteUploadedPhoto, saveUploadedPhoto, saveUploadedTrackFile } from '$lib/server/storage';
 import { parseGpxTrack } from '$lib/server/gpx';
+import { fetchHistoricalWeather } from '$lib/server/weather';
 import {
 	generateActivitySlug,
 	normalizeSport,
@@ -119,6 +120,27 @@ export const actions: Actions = {
 					originalName: photoFile.name || null,
 					position
 				});
+			}
+
+			// Best-effort — Open-Meteo's archive has a ~5-day lag, so a freshly-uploaded activity
+			// commonly gets no data yet (null return, not an error). Never let a weather API hiccup
+			// fail the whole upload; scripts/backfill-weather.mjs re-fetches missing ones later.
+			try {
+				const [startLat, startLon] = parsed.points[0];
+				const weather = await fetchHistoricalWeather(startLat, startLon, parsed.startedAt);
+				if (weather) {
+					await db
+						.update(activity)
+						.set({
+							weatherTempC: weather.tempC,
+							weatherCode: weather.code,
+							weatherWindKph: weather.windKph,
+							weatherPrecipitationMm: weather.precipitationMm
+						})
+						.where(eq(activity.id, id));
+				}
+			} catch {
+				// ignored — see comment above
 			}
 		} catch (err) {
 			await Promise.all(savedFilenames.map((saved) => deleteUploadedPhoto(saved)));

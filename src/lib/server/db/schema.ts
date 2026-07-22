@@ -169,6 +169,15 @@ export const activity = sqliteTable('activity', {
 	// sampling preserving first+last exactly) — read-only map rendering only, never re-parsed
 	// for stats.
 	trackPoints: text('track_points').notNull(),
+	// Historical weather at the track's start point + startedAt, fetched best-effort from
+	// Open-Meteo's archive API (see lib/server/weather.ts) — all four nullable together, no
+	// default: unset until the fetch succeeds (fresh upload where Open-Meteo's ~5-day reanalysis
+	// delay hasn't caught up yet, an API hiccup, or an activity created before this feature
+	// existed and not yet backfilled via scripts/backfill-weather.mjs).
+	weatherTempC: real('weather_temp_c'),
+	weatherCode: integer('weather_code'), // WMO weather interpretation code, see lib/weather.ts
+	weatherWindKph: real('weather_wind_kph'),
+	weatherPrecipitationMm: real('weather_precipitation_mm'),
 	authorId: text('author_id')
 		.notNull()
 		.references(() => user.id, { onDelete: 'cascade' }),
