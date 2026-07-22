@@ -5,7 +5,10 @@
 Nutzerwunsch, direkt im Anschluss an den entfernten „Neuer Beitrag"-Nav-Link: gleiche
 Behandlung für den Login-Link. Widerspricht bewusst der früheren Entscheidung aus
 „öffentliche und eingeloggte Navigation" (Login sollte dort öffentlich auffindbar sein) —
-das war die alte Vorgabe, jetzt ausdrücklich revidiert.
+das war die alte Vorgabe. **Nutzer hat das explizit als Dauerregel festgelegt: Login darf
+niemals öffentlich auffindbar gemacht werden** (nicht nur diese einmalige Änderung) — bei
+künftigen Nav-/Auffindbarkeits-Arbeiten nicht erneut einen Login-Link für ausgeloggte
+Besucher einführen.
 
 - [x] `+layout.svelte`: „Anmelden"-Link aus Kopfzeile und Sidebar entfernt (inkl. toter
       `.login-link`/`.desktop-login`-CSS und der dadurch ungenutzten `loginHref`-Ableitung);
