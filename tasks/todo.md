@@ -1,5 +1,24 @@
 # Todo
 
+## „Anmelden"-Link aus der Nav entfernt — erledigt
+
+Nutzerwunsch, direkt im Anschluss an den entfernten „Neuer Beitrag"-Nav-Link: gleiche
+Behandlung für den Login-Link. Widerspricht bewusst der früheren Entscheidung aus
+„öffentliche und eingeloggte Navigation" (Login sollte dort öffentlich auffindbar sein) —
+das war die alte Vorgabe, jetzt ausdrücklich revidiert.
+
+- [x] `+layout.svelte`: „Anmelden"-Link aus Kopfzeile und Sidebar entfernt (inkl. toter
+      `.login-link`/`.desktop-login`-CSS und der dadurch ungenutzten `loginHref`-Ableitung);
+      `isLoginPage` bleibt für Chrome-Free-Layout und die Nav-Ausblendung auf `/login` selbst
+      erhalten
+- [x] `/login` bleibt unverändert per Direktaufruf erreichbar (kein Link mehr dorthin, aber
+      Route/Redirect-Verhalten unangetastet)
+- [x] `npm run check` — 0 Fehler
+- [x] Mit temporärem QA-User (danach gelöscht) im Browser geprüft: ausgeloggt zeigt weder
+      Desktop-Sidebar noch mobile Kopfzeile einen Login-Link; `/login` funktioniert per
+      Direktaufruf weiterhin, Login setzt korrekt `data.user`, „Abmelden" erscheint danach an
+      beiden Stellen wie zuvor
+
 ## Doppelter „Neuer Beitrag"-Einstieg entfernt — erledigt
 
 Nutzerhinweis: Nav-Link „+ Beitrag"/„+ Neuer Beitrag" und der Feed-eigene Composer sind zwei

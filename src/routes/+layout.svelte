@@ -28,9 +28,6 @@
 
 	const isLoginPage = $derived(page.url.pathname === '/login');
 	const isFeedPage = $derived(page.url.pathname === '/');
-	const loginHref = $derived(
-		`/login?redirectTo=${encodeURIComponent(`${page.url.pathname}${page.url.search}${page.url.hash}`)}`
-	);
 	const currentLocation = $derived(`${page.url.pathname}${page.url.search}${page.url.hash}`);
 	let mainContent: HTMLElement;
 
@@ -76,8 +73,6 @@
 					<input type="hidden" name="redirectTo" value={currentLocation} />
 					<button type="submit" class="logout">Abmelden</button>
 				</form>
-			{:else if !isLoginPage}
-				<a class="login-link" href={loginHref}>Anmelden</a>
 			{/if}
 			</div>
 		</div>
@@ -106,8 +101,6 @@
 					<input type="hidden" name="redirectTo" value={currentLocation} />
 					<button type="submit" class="logout">Abmelden</button>
 				</form>
-			{:else}
-				<a class="login-link desktop-login" href={loginHref}>Anmelden</a>
 			{/if}
 		</aside>
 	{/if}
@@ -185,12 +178,6 @@
 		gap: 10px;
 		font-size: 14px;
 		font-weight: 600;
-	}
-	.login-link {
-		display: inline-flex;
-		align-items: center;
-		min-height: 44px;
-		color: var(--fb-blue);
 	}
 	.topnav-actions form {
 		display: flex;
@@ -288,10 +275,6 @@
 		.sidebar-nav .brand {
 			font-size: 18px;
 			padding: 0 12px;
-		}
-		.sidebar-nav .desktop-login {
-			margin-top: 8px;
-			color: var(--fb-blue);
 		}
 		.sidebar-nav form {
 			padding: 0 12px;
