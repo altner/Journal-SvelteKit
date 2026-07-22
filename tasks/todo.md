@@ -555,9 +555,10 @@ Plan mit Nutzer abgestimmt (Details: `/Users/adrian/.claude/plans/k-nnen-wir-den
         entfernt
 - [ ] Nicht deployed — Produktions-DB braucht dieselbe `CREATE TABLE activity`-Migration (rein
       additiv, kein Risiko) vor dem nächsten Deploy
-- [ ] FIT-Support bewusst zurückgestellt — Architektur ist darauf vorbereitet (Endungs-Parameter
-      in `saveUploadedTrackFile`, Dateiendung statt eigener `sourceFormat`-Spalte steuert Format-
-      Dispatch), aber noch nicht umgesetzt
+- [x] **Nutzerentscheidung:** FIT-Support wird nicht benötigt — bleibt bei nur GPX. Der
+      Endungs-Parameter in `saveUploadedTrackFile` ist trotzdem kein Problem, war nie
+      FIT-spezifisch, sondern ein generisches Allow-List-Argument statt einer hartkodierten
+      Endung
 
 ## Kanonische URLs + SEO-Metadaten für Alben & Einzelfotos — erledigt
 

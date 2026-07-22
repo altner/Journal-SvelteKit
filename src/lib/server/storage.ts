@@ -30,8 +30,7 @@ export async function saveUploadedPhoto(
 }
 
 // Raw file storage for non-image uploads (GPS tracks) — no transcoding, unlike saveUploadedPhoto.
-// Takes the caller's allow-list of extensions (today just ['.gpx']) rather than hardcoding one,
-// so adding FIT support later is a new call-site argument, not a rewrite of this function.
+// Takes the caller's allow-list of extensions (today just ['.gpx']) rather than hardcoding one.
 export async function saveUploadedTrackFile(
 	file: File,
 	allowedExtensions: string[]
