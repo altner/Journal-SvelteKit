@@ -93,6 +93,7 @@ export const actions: Actions = {
 
 		const data = await request.formData();
 		const albumTitle = String(data.get('albumTitle') ?? '').trim();
+		const albumDescription = String(data.get('albumDescription') ?? '').trim();
 		const photoIds = data.getAll('photoIds').map(String).filter(Boolean);
 
 		if (photoIds.length < 2) {
@@ -122,6 +123,7 @@ export const actions: Actions = {
 				id: albumId,
 				slug: albumSlug,
 				title: albumTitleFinal,
+				description: albumDescription || null,
 				originPostId: null,
 				authorId: user.id,
 				createdAt: new Date()

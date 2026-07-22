@@ -26,6 +26,8 @@ export const session = sqliteTable('session', {
 export const album = sqliteTable('album', {
 	id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
 	title: text('title').notNull(),
+	// optional free-text description, set once at album-creation time (no separate edit flow yet)
+	description: text('description'),
 	// URL slug, generated once at creation time and never changed again — see generateAlbumSlug
 	// in albums.ts. Nullable + unique for the same db:push-safety reason as post.slug.
 	slug: text('slug').unique(),

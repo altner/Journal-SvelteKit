@@ -97,9 +97,11 @@
 
 <svelte:head>
 	<title>{headTitle}</title>
+	{#if data.album.description}<meta name="description" content={data.album.description} />{/if}
 	<link rel="canonical" href={data.canonicalUrl} />
 	<meta property="og:type" content="article" />
 	<meta property="og:title" content={headTitle} />
+	{#if data.album.description}<meta property="og:description" content={data.album.description} />{/if}
 	<meta property="og:url" content={data.canonicalUrl} />
 	{#if data.ogImage}<meta property="og:image" content={data.ogImage} />{/if}
 	<meta name="twitter:card" content={data.ogImage ? 'summary_large_image' : 'summary'} />
@@ -115,6 +117,10 @@
 			</OwnerActions>
 		{/if}
 	</div>
+
+	{#if data.album.description}
+		<p class="description">{data.album.description}</p>
+	{/if}
 
 	{#if data.album.originPostId}
 		<a class="origin" href="/posts/{data.originPostSlug}">Zum ursprünglichen Beitrag</a>
@@ -262,6 +268,12 @@
 	h1 {
 		font-size: 20px;
 		margin: 0 0 6px 0;
+	}
+	.description {
+		font-size: 15px;
+		color: #050505;
+		white-space: pre-wrap;
+		margin: 0 0 16px 0;
 	}
 	.origin {
 		display: inline-flex;

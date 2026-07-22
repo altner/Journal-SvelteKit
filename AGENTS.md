@@ -157,7 +157,8 @@ gone) current route entirely.
 build output (see README's deployment section) since the build directory doesn't persist across
 deploys. `ORIGIN` must match the real deployment URL or SvelteKit's CSRF protection will block all
 form submissions (login, post creation, etc.). `BODY_SIZE_LIMIT` governs max upload size (default
-512KB is too small for photo uploads; `.env.example` sets it to `20M`).
+512KB is too small for photo uploads; `.env.example` sets it to `100M` — activity uploads bundle a
+GPX track with multiple unresized photos in one request and have hit ~48M in practice).
 
 **Photo lightbox (deep-linkable, via SvelteKit shallow routing):** clicking a photo in
 `src/lib/components/PhotoGrid.svelte` doesn't just toggle local state — it calls `pushState()`

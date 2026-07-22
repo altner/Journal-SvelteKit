@@ -67,7 +67,8 @@ Wichtig:
 - **`DATABASE_URL` und `UPLOAD_DIR` müssen auf einen persistenten Pfad zeigen**, der Deployments
   überlebt (nicht im Build-Ordner).
 - **`BODY_SIZE_LIMIT`** in der `.env` steuert die maximale Upload-Größe pro Request (Standard im
-  Adapter: 512 KB — in `.env.example` bereits auf `20M` gesetzt).
+  Adapter: 512 KB — in `.env.example` bereits auf `100M` gesetzt, da ein Aktivitäts-Upload GPX-Track
+  und mehrere unverkleinerte Fotos in einem Request bündelt und real schon ~48 MB erreicht hat).
 - **`ORIGIN`** muss auf deine echte URL gesetzt sein, sonst blockiert SvelteKits CSRF-Schutz alle
   Formular-Submits (Login, Post erstellen, …).
 

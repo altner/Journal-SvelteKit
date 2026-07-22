@@ -59,6 +59,7 @@ export const actions: Actions = {
 		const title = String(data.get('title') ?? '').trim();
 		const saveAsAlbum = data.get('saveAsAlbum') === 'on';
 		const albumTitle = String(data.get('albumTitle') ?? '').trim();
+		const albumDescription = String(data.get('albumDescription') ?? '').trim();
 		const createdAt = resolveCreatedAt(
 			String(data.get('date') ?? '').trim(),
 			String(data.get('time') ?? '').trim()
@@ -120,6 +121,7 @@ export const actions: Actions = {
 					id: albumId,
 					slug: albumSlug,
 					title: albumTitleFinal,
+					description: albumDescription || null,
 					originPostId: createdPost.id,
 					authorId: user.id,
 					createdAt

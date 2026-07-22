@@ -43,6 +43,7 @@ export const actions: Actions = {
 
 		const data = await request.formData();
 		const albumTitle = String(data.get('albumTitle') ?? '').trim();
+		const albumDescription = String(data.get('albumDescription') ?? '').trim();
 		const files = data
 			.getAll('photos')
 			.filter((f): f is File => f instanceof File && f.size > 0);
@@ -74,6 +75,7 @@ export const actions: Actions = {
 				id: albumId,
 				slug: albumSlug,
 				title: albumTitleFinal,
+				description: albumDescription || null,
 				originPostId: createdPost.id,
 				authorId: user.id,
 				createdAt

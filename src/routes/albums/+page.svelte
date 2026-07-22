@@ -113,6 +113,12 @@
 				</label>
 
 				<label>
+					Beschreibung (optional)
+					<textarea name="albumDescription" rows="2" placeholder="Worum geht's in diesem Album?"
+					></textarea>
+				</label>
+
+				<label>
 					Fotos (mindestens 2)
 					<input type="file" name="photos" accept="image/*" multiple onchange={onFilesChange} />
 				</label>
@@ -195,7 +201,8 @@
 		font-size: 13px;
 		color: var(--fb-gray);
 	}
-	.create-album-form input[type='text'] {
+	.create-album-form input[type='text'],
+	.create-album-form textarea {
 		padding: 10px 12px;
 		border: 1px solid var(--fb-border);
 		border-radius: 6px;

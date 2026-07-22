@@ -161,6 +161,12 @@
 			Album-Titel (optional)
 			<input type="text" name="albumTitle" placeholder="z. B. Urlaub 2026" />
 		</label>
+
+		<label>
+			Album-Beschreibung (optional)
+			<textarea name="albumDescription" rows="2" placeholder="Worum geht's in diesem Album?"
+			></textarea>
+		</label>
 	{:else if photoCount === 1}
 		<p class="hint">Einzelnes Foto — landet im Foto-Stream.</p>
 	{/if}
@@ -242,7 +248,8 @@
 	.date-time-row label {
 		flex: 1;
 	}
-	input[type='text'] {
+	input[type='text'],
+	textarea {
 		padding: 10px 12px;
 		border: 1px solid var(--fb-border);
 		border-radius: 6px;
