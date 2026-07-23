@@ -1,6 +1,6 @@
 import type { PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
-import { and, asc, desc, eq, gt, isNull, lt, or } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, lt, or } from 'drizzle-orm';
 import { post } from '$lib/server/db/schema';
 import { finishPage, PAGE_SIZE, readPageCursor } from '$lib/server/pagination';
 
@@ -11,12 +11,8 @@ export const load: PageServerLoad = async ({ url }) => {
 			? or(lt(post.createdAt, cursor.date), and(eq(post.createdAt, cursor.date), lt(post.id, cursor.id)))
 			: or(gt(post.createdAt, cursor.date), and(eq(post.createdAt, cursor.date), gt(post.id, cursor.id)))
 		: undefined;
-	// "Beiträge" is for user-authored posts — checkins get their own /checkins listing (like
-	// isStatusPost's "photos added" posts are excluded from being edit-worthy, checkins are
-	// excluded from being counted as a Beitrag here), but stay visible in the main Feed.
-	const notCheckin = or(isNull(post.isCheckin), eq(post.isCheckin, false));
 	const posts = await db.query.post.findMany({
-		where: cursorWhere ? and(notCheckin, cursorWhere) : notCheckin,
+		where: cursorWhere ? and(eq(post.isCheckin, true), cursorWhere) : eq(post.isCheckin, true),
 		orderBy: cursor?.direction === 'after'
 			? [asc(post.createdAt), asc(post.id)]
 			: [desc(post.createdAt), desc(post.id)],

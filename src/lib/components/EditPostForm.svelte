@@ -8,6 +8,7 @@
 
 	let {
 		postSlug,
+		basePath = '/posts',
 		title,
 		blocks,
 		tags = [],
@@ -16,6 +17,7 @@
 		onCancel
 	}: {
 		postSlug: string;
+		basePath?: '/posts' | '/checkins';
 		title: string | null;
 		blocks: (
 			| { id: string; type: 'text'; text: string }
@@ -64,7 +66,7 @@
 
 <form
 	method="POST"
-	action="/posts/{postSlug}?/edit"
+	action="{basePath}/{postSlug}?/edit"
 	enctype="multipart/form-data"
 	class="edit-form"
 	aria-busy={submitting}

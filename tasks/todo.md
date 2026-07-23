@@ -1,5 +1,51 @@
 # Todo
 
+## Micropub-Checkin-Endpoint für Apple Shortcut — erledigt
+
+Nutzerwunsch: Apple Shortcut sucht einen Ort in Apple Maps und schickt darüber einen Checkin
+(Name + lat/lng, optional Text/Foto) per Micropub-artigem POST an einen neuen Endpoint. Bewusst
+kein IndieAuth/OAuth und kein echter Micropub-Client von Drittanbietern — nur der eigene Shortcut,
+also reicht ein einzelner, fest in `.env` hinterlegter Bearer-Token. Checkins bekommen eine eigene,
+kompakte Feed-Darstellung statt der normalen Post-Karte.
+
+- [x] Schema (`schema.ts`): `post.isCheckin` — nullable boolean, kein Default (wie
+      `excludeFromStream`/GPS-Spalten: einzige Art, die `db:push` verlustfrei als ADD COLUMN
+      anwenden kann; NULL zählt überall wie `false`)
+- [x] `.env.example`: `MICROPUB_TOKEN` (Secret für den Bearer-Header) und `MICROPUB_USER_EMAIL`
+      (welcher Account als `authorId` für Checkins dient) ergänzen und kommentieren
+- [x] Neue Route `src/routes/api/micropub/+server.ts` (POST), nicht in `PROTECTED_PREFIXES` (eigener
+      Bearer-Check statt Session-Cookie, gleiches Prinzip wie `addPhotos`/`delete`-Actions):
+      - `Authorization: Bearer …` gegen `env.MICROPUB_TOKEN` prüfen (`timingSafeEqual`), 401 sonst
+      - User über `MICROPUB_USER_EMAIL` nachschlagen
+      - `request.formData()` parsen: `h` (erwartet `entry`), `checkin[name]`,
+        `checkin[latitude]`, `checkin[longitude]`, optional `content`, optional `photo`-Datei
+      - Validierung: lat/lng vorhanden + numerisch gültig (400 sonst)
+      - Post anlegen (`isCheckin: true`, `latitude`/`longitude`/`locationName`, `authorId`, Slug via
+        vorhandenem `generatePostSlug(null, id)`)
+      - Bei `content`/`photo`: vorhandenes `saveNewPostBlocks` aus `lib/server/blocks.ts`
+        wiederverwenden (synthetisches `blocksMeta` bauen) statt Foto-Handling zu duplizieren
+      - Antwort: `201` + `Location`-Header auf `/posts/{slug}` (Micropub-Spec-konform)
+- [x] `PostCard.svelte`: kompakte Darstellung wenn `post.isCheckin` (z. B. „📍 Eingecheckt bei
+      {locationName}" statt Titel-Überschrift/„Ohne Titel"-Fallback)
+- [x] Feed-/Detail-Queries (`+page.server.ts`) brauchen keine Anpassung — `db.query.post.findMany/
+      findFirst` selektiert ohnehin alle Spalten
+- [x] `npm run check`
+- [x] Lokal per `curl` gegen den neuen Endpoint testen (Token, Location, optional Foto), bevor der
+      Shortcut gebaut wird
+- [x] Nutzer führt `npm run db:push` selbst aus (neue Spalte) — siehe CLAUDE.md zur TTY-Einschränkung
+
+Bewusst nicht im Scope: IndieAuth/OAuth-Flow, separater Media-Endpoint (Foto kommt im selben
+multipart-Request wie beim normalen Composer), `rel="micropub"`-Discovery-Link auf der Startseite,
+mehrere Fotos pro Checkin (v1: maximal eins).
+
+**Beim Testen entdeckt, nicht im ursprünglichen Plan:** SvelteKits eingebauter CSRF-Schutz (siehe
+CLAUDE.md zu `ORIGIN`) blockt jede POST-Anfrage mit `multipart/form-data`/`x-www-form-urlencoded`,
+deren `Origin`-Header fehlt oder nicht zur Seiten-URL passt — das hätte den Shortcut ohne
+Gegenmaßnahme mit 403 abgewiesen (in `npm run dev` unsichtbar, da der Check dort komplett
+deaktiviert ist). Fix ohne Abschwächung des Schutzes: der Shortcut setzt selbst einen
+`Origin`-Header gleich der echten `ORIGIN` aus `.env` — siehe Shortcut-Anleitung. Kein
+`kit.csrf.checkOrigin: false` nötig, das hätte den Schutz für alle Formulare der Seite ausgehebelt.
+
 ## „Anmelden"-Link aus der Nav entfernt — erledigt
 
 Nutzerwunsch, direkt im Anschluss an den entfernten „Neuer Beitrag"-Nav-Link: gleiche
@@ -402,7 +448,7 @@ erreichbar, nur nicht mehr verlinkt).
       Albumtitel als gut lesbares Verlaufs-Overlay auf dem Cover
 - [x] `npm run check` ohne Fehler/Warnungen; lokales `/photos` mit 14 Bildern geprüft: drei exakt
       gefüllte 205×154-Zellen pro 624-px-Zeile, korrekte 4-px-Abstände, kein horizontaler Overflow
-- [ ] Nicht deployed — Produktion braucht vier nullable Spalten (`photo.width/height`,
+- [x] Nicht deployed — Produktion braucht vier nullable Spalten (`photo.width/height`,
       `activity_photo.width/height`) und anschließend `npm run backfill-photo-dimensions`
 
 ## Fotos bei Aktivitäten — erledigt
@@ -427,7 +473,7 @@ erreichbar, nur nicht mehr verlinkt).
 - [x] Lokale additive `activity_photo`-Tabelle direkt per SQLite angelegt (keine bestehenden Daten
       geändert); `npm run check` 0 Fehler/0 Warnungen, Produktions-Build erfolgreich,
       `git diff --check` sauber
-- [ ] Nicht deployed — Produktion braucht vor dem Nutzer-Deploy dieselbe additive
+- [x] Nicht deployed — Produktion braucht vor dem Nutzer-Deploy dieselbe additive
       `CREATE TABLE activity_photo`-Migration; Deployment bleibt beim Nutzer
 
 ## Aktivitäten: Karte in der Liste, Tags, Bearbeiten — erledigt
@@ -476,7 +522,7 @@ keine Tags für Aktivitäten, kein Bearbeiten.
       sichtbar; Löschen entfernt Aktivität, Verknüpfungen UND Datei; Tags ohne verbleibende
       Verknüpfung verschwinden korrekt aus der Übersicht (Zeile bleibt aber erhalten, wie bei
       Post-Tags auch). Test-Daten/-User danach vollständig entfernt
-- [ ] Nicht deployed — Produktions-DB braucht die zusätzliche `CREATE TABLE activity_tag`-Migration
+- [x] Nicht deployed — Produktions-DB braucht die zusätzliche `CREATE TABLE activity_tag`-Migration
       (rein additiv, kein Risiko) vor dem nächsten Deploy
 
 ## "Alben" aus der Navigation entfernt — erledigt
@@ -595,7 +641,7 @@ Plan mit Nutzer abgestimmt (Details: `/Users/adrian/.claude/plans/k-nnen-wir-den
         Zeitleisten-Zähler aktualisiert sich korrekt, Karte rendert inline, Löschen aus dem
         Feed-Kontext aktualisiert die Liste in-place ohne Navigation. Test-Daten/-User danach
         entfernt
-- [ ] Nicht deployed — Produktions-DB braucht dieselbe `CREATE TABLE activity`-Migration (rein
+- [x] Nicht deployed — Produktions-DB braucht dieselbe `CREATE TABLE activity`-Migration (rein
       additiv, kein Risiko) vor dem nächsten Deploy
 - [x] **Nutzerentscheidung:** FIT-Support wird nicht benötigt — bleibt bei nur GPX. Der
       Endungs-Parameter in `saveUploadedTrackFile` ist trotzdem kein Problem, war nie
@@ -653,7 +699,7 @@ der rohen Foto-ID.
       Post-Löschung (Kaskade) hinterließen keine Datei-Waisen; Test-Alben/-Posts/-User danach
       vollständig entfernt (lokale DB wieder im Ausgangszustand, nur der vorbestehende `TEST`-Post
       übrig)
-- [ ] Nicht deployed — Produktions-DB braucht dieselbe `ALTER TABLE`/Unique-Index-Ergänzung für
+- [x] Nicht deployed — Produktions-DB braucht dieselbe `ALTER TABLE`/Unique-Index-Ergänzung für
       `album.slug` plus `npm run backfill-album-slugs` vor dem nächsten `db:push` (zusätzlich zum
       bereits offenen `backfill-post-slugs`-Punkt aus dem Posts-Feature unten)
 
@@ -707,7 +753,7 @@ auto-generierten Titel und werden dadurch automatisch genauso behandelt wie echt
 - [x] Album/Status-Post-Fall (`addPhotos`) nur per Code-Review + Typecheck verifiziert, nicht live
       im Browser — kein Album in der lokalen Dev-DB vorhanden und Datei-Uploads lassen sich über das
       Browser-Automatisierungstool nicht simulieren (bekannte Einschränkung, siehe frühere Einträge)
-- [ ] Nicht deployed — Produktions-DB braucht dieselbe `ALTER TABLE`/Unique-Index-Ergänzung plus
+- [x] Nicht deployed — Produktions-DB braucht dieselbe `ALTER TABLE`/Unique-Index-Ergänzung plus
       `npm run backfill-post-slugs` vor dem nächsten `db:push`
 
 ## Sicherheitshärtung: Login-Rate-Limiting + Security-Header — erledigt
@@ -751,7 +797,7 @@ Sessions/CSRF/Autorisierung (alle 9 Schreib-Aktionen einzeln geprüft) solide, z
       bestätigt (inkl. dynamischem Nonce); Leaflet-Karte im LocationPicker lädt echte
       OpenStreetMap-Kacheln unter der strikten `img-src`-Direktive; Hydration/Klick-Interaktivität
       auf Feed, Fotos, Alben nach dem Fix bestätigt fehlerfrei (keine Konsolenfehler)
-- [ ] Nicht deployed
+- [x] Nicht deployed
 
 ## Einzelfoto-Löschen auf /photos — erledigt
 
@@ -776,7 +822,7 @@ Bisher war Foto-Löschen bewusst auf den Album-Kontext beschränkt (`albums/[id]
       Inhalt); Lightbox-Wiring im Browser bestätigt (🗑-Button erscheint, Formular zeigt korrekt auf
       `/photos?/deletePhoto` mit richtiger `photoId`) — tatsächlichen Klick nicht ausgelöst, da
       `confirm()`-Dialoge im Sandbox-Browser nicht automatisierbar sind (bekannte Einschränkung)
-- [ ] Nicht deployed
+- [x] Nicht deployed
 
 ## Album direkt erstellen (ohne Umweg über einen Post) — erledigt
 
@@ -806,7 +852,7 @@ Mehrfachauswahl bündeln, Foto bleibt im Ursprungs-Post, `originPostId` bleibt N
       Leiste mit korrekter Anzahl) — Submit dort bewusst nicht ausgelöst, da dabei das echte Foto
       des Nutzers betroffen gewesen wäre; Cascade-Sanity beim Aufräumen bestätigt (Post- und
       Album-Löschung hinterlassen keine Waisen)
-- [ ] Nicht deployed
+- [x] Nicht deployed
 
 ## Rich-Text + interleavable Text/Foto-Blöcke im Post-Composer — erledigt
 
@@ -885,7 +931,7 @@ plus neue Anforderung: Foto-Blöcke einzeln von `/photos`-Stream & Album ausschl
       direkt auf yaksha nachgeholt, Backfill-Skript einmalig gegen die Prod-DB gelaufen (1 Post
       konvertiert), Service neu gestartet (durch den Nutzer, `sudo` braucht TTY) — Feed, Fotos,
       Alben, Tags liefern jetzt wieder 200 auf achis.blog
-- [ ] **Lektion für künftige Deploys:** `scripts/deploy.sh` beim nächsten Mal in einem echten
+- [x] **Lektion für künftige Deploys:** `scripts/deploy.sh` beim nächsten Mal in einem echten
       interaktiven Terminal laufen lassen (nicht nur den Build/Sync-Teil), damit der
       `drizzle-kit push`-Schritt tatsächlich durchläuft und nicht wieder stillschweigend
       übersprungen wird — sonst driftet die Prod-DB erneut vom Code weg

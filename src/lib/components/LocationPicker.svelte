@@ -273,6 +273,9 @@
 		height: 260px;
 		border-radius: 6px;
 		overflow: hidden;
+		/* See TrackMap.svelte — same Leaflet z-index leak onto the fixed/sticky nav chrome. */
+		position: relative;
+		isolation: isolate;
 	}
 	button {
 		align-self: flex-start;

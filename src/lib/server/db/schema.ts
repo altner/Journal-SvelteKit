@@ -59,6 +59,10 @@ export const post = sqliteTable('post', {
 	// true only for auto-generated "photos added" posts (albums/[id] addPhotos action) —
 	// those stay deletable but not editable.
 	isStatusPost: integer('is_status_post', { mode: 'boolean' }).notNull().default(false),
+	// true only for posts created via the Micropub checkin endpoint (routes/api/micropub).
+	// Nullable, no default (like excludeFromStream/the GPS columns below) so `db:push` can only
+	// ever emit a lossless ADD COLUMN here — NULL means "not a checkin", same as false.
+	isCheckin: integer('is_checkin', { mode: 'boolean' }),
 	// GPS location, all nullable — a post can exist without one. Nullable, no default, so
 	// `db:push` can only ever emit a lossless ADD COLUMN for these (see CLAUDE.md: adding
 	// isStatusPost, a NOT NULL column even WITH a default, once made drizzle-kit propose

@@ -55,6 +55,11 @@
 		height: 320px;
 		border-radius: 6px;
 		overflow: hidden;
+		/* Leaflet's own CSS puts its controls (zoom, attribution) at z-index: 1000 — without a
+		   dedicated stacking context here, that escapes and stacks above the fixed mobile nav /
+		   sticky header (z-index 10/20), which visibly "floats" the map above them on scroll. */
+		position: relative;
+		isolation: isolate;
 	}
 	@media (min-width: 768px) {
 		.track-map {

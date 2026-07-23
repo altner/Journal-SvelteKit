@@ -10,13 +10,17 @@
 		width?: number | null;
 		height?: number | null;
 	};
-	let { photos, priority = false }: { photos: Photo[]; priority?: boolean } = $props();
+	let {
+		photos,
+		priority = false,
+		basePath = '/posts'
+	}: { photos: Photo[]; priority?: boolean; basePath?: '/posts' | '/checkins' } = $props();
 
 	const shown = $derived(photos.slice(0, 5));
 	const extra = $derived(photos.length - shown.length);
 
 	function hrefFor(photo: Photo) {
-		return `/posts/${photo.postId}/photo/${photo.id}`;
+		return `${basePath}/${photo.postId}/photo/${photo.id}`;
 	}
 
 	function isPlainClick(e: MouseEvent) {

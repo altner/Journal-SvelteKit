@@ -15,6 +15,7 @@
 		{ href: '/posts', label: 'Beiträge', sections: ['/posts'] },
 		{ href: '/photos', label: 'Fotos', sections: ['/photos', '/albums'] },
 		{ href: '/activities', label: 'Aktivitäten', sections: ['/activities'] },
+		{ href: '/checkins', label: 'Checkins', sections: ['/checkins'] },
 		{ href: '/tags', label: 'Tags', sections: ['/tags'] }
 	];
 

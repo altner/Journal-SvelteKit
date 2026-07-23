@@ -1,8 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { CONTACT_EMAIL } from '$lib/consts';
-
-const USER_AGENT = `achis.blog (+mailto:${CONTACT_EMAIL})`;
+import { reverseGeocode } from '$lib/server/geocode';
 
 export const GET: RequestHandler = async ({ url, locals, fetch }) => {
 	// Auth-gated for the same reason addPhotos/delete/edit actions are: this endpoint is a live
@@ -24,30 +22,10 @@ export const GET: RequestHandler = async ({ url, locals, fetch }) => {
 		return json({ error: 'Ungültige Koordinaten.' }, { status: 400 });
 	}
 
-	const nominatimUrl =
-		`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}` +
-		`&zoom=18&addressdetails=1`;
-
-	let res: Response;
 	try {
-		res = await fetch(nominatimUrl, { headers: { 'User-Agent': USER_AGENT } });
+		const { place, country, poiName } = await reverseGeocode(lat, lon, fetch);
+		return json({ place, country, poiName });
 	} catch {
 		return json({ error: 'Nominatim ist nicht erreichbar.' }, { status: 502 });
 	}
-	if (!res.ok) {
-		return json({ error: `Nominatim-Fehler (${res.status}).` }, { status: 502 });
-	}
-
-	const data = await res.json();
-	const address = data.address ?? {};
-	// OSM addressing represents "the settlement" at different admin levels depending on locale/
-	// mapping detail — city (large places), town, village (rural) cover the realistic cases.
-	const place: string | null = address.city ?? address.town ?? address.village ?? null;
-	const country: string | null = address.country ?? null;
-	// `name` is only present when the point resolves to a named feature (park, landmark,
-	// building) rather than a plain address — exactly the POI-suggestion signal we want.
-	const poiName: string | null =
-		typeof data.name === 'string' && data.name.trim() ? data.name.trim() : null;
-
-	return json({ place, country, poiName });
 };

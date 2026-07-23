@@ -27,6 +27,7 @@
 			title: string | null;
 			createdAt: Date | string;
 			isStatusPost: boolean;
+			isCheckin: boolean | null;
 			anchorId?: string | null;
 			blocks: Block[];
 			album: {
@@ -62,18 +63,28 @@
 		});
 	}
 
-	function formatLocation(p: {
-		locationName: string | null;
-		locationPlace: string | null;
-		locationCountry: string | null;
-	}) {
+	function formatLocation(
+		p: {
+			locationName: string | null;
+			locationPlace: string | null;
+			locationCountry: string | null;
+		},
+		omitName = false
+	) {
 		const placeAndCountry = [p.locationPlace, p.locationCountry].filter(Boolean).join(', ');
+		if (omitName) return placeAndCountry;
 		return [p.locationName, placeAndCountry].filter(Boolean).join(' · ');
+	}
+
+	function checkinTitle(p: { locationName: string | null }) {
+		return p.locationName ? `📍 Eingecheckt: ${p.locationName}` : '📍 Eingecheckt';
 	}
 
 	function isExcludedBlock(block: Block) {
 		return block.type === 'photos' && block.photos.length > 0 && block.photos.every((p) => !!p.excludeFromStream);
 	}
+
+	const basePath = $derived(post.isCheckin ? '/checkins' : '/posts');
 
 	const isOrigin = $derived(post.album != null && post.album.originPostId === post.id);
 	const firstAlbumBlockId = $derived(
@@ -113,9 +124,9 @@
 	<div class="post-header">
 		<div class="post-meta">
 			{#if headingLevel === 1}
-				<h1 class="post-title detail-title">{post.title || 'Ohne Titel'}</h1>
+				<h1 class="post-title detail-title">{post.title || (post.isCheckin ? checkinTitle(post) : 'Ohne Titel')}</h1>
 			{:else if !editing}
-					<h2 class="post-title"><a href="/posts/{post.slug ?? post.id}">{post.title || 'Ohne Titel'}</a></h2>
+					<h2 class="post-title"><a href="{basePath}/{post.slug ?? post.id}">{post.title || (post.isCheckin ? checkinTitle(post) : 'Ohne Titel')}</a></h2>
 			{/if}
 			<div class="post-sub">
 				<span>{formatDate(post.createdAt)}</span>
@@ -130,7 +141,7 @@
 						class="location-pill"
 						href={`https://www.openstreetmap.org/?mlat=${post.latitude}&mlon=${post.longitude}#map=16/${post.latitude}/${post.longitude}`}
 						target="_blank"
-						rel="noopener noreferrer">📍 {formatLocation(post)}</a
+						rel="noopener noreferrer">{post.isCheckin ? '' : '📍 '}{formatLocation(post, !!post.isCheckin)}</a
 					>
 				</div>
 			{/if}
@@ -147,7 +158,7 @@
 				{#if !post.isStatusPost && !editing}
 					<button type="button" class="edit-btn" onclick={startEditing}>Bearbeiten</button>
 				{/if}
-				<DeletePostButton postSlug={post.slug ?? post.id} {afterDelete} />
+				<DeletePostButton postSlug={post.slug ?? post.id} {basePath} {afterDelete} />
 			</OwnerActions>
 		{/if}
 	</div>
@@ -155,6 +166,7 @@
 	{#if editing}
 		<EditPostForm
 			postSlug={post.slug ?? post.id}
+			{basePath}
 			title={post.title}
 			blocks={editableBlocks()}
 			tags={post.tags.map((t) => t.name)}
@@ -177,9 +189,9 @@
 					<div class="post-text">{@html renderMarkdownToSafeHtml(block.text)}</div>
 				{/if}
 			{:else if block.id === firstAlbumBlockId}
-				<PhotoGrid photos={post.album?.photos ?? []} priority={priority && block.id === firstVisiblePhotoBlockId} />
+				<PhotoGrid photos={post.album?.photos ?? []} priority={priority && block.id === firstVisiblePhotoBlockId} {basePath} />
 			{:else if !(isOrigin && !isExcludedBlock(block))}
-				<PhotoGrid photos={block.photos} priority={priority && block.id === firstVisiblePhotoBlockId} />
+				<PhotoGrid photos={block.photos} priority={priority && block.id === firstVisiblePhotoBlockId} {basePath} />
 			{/if}
 		{/each}
 	{/if}
