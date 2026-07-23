@@ -3,7 +3,17 @@
 	import 'leaflet/dist/leaflet.css';
 	import type * as LeafletNS from 'leaflet';
 
-	let { points }: { points: [number, number][] } = $props();
+	let {
+		points,
+		containerLabel = 'Interaktive Streckenkarte',
+		singlePointLabel = 'Streckenpunkt'
+	}: {
+		points: [number, number][];
+		// Overridable so non-activity callers (e.g. CheckinCard's single-point map) can supply
+		// context-appropriate text instead of activity-specific wording.
+		containerLabel?: string;
+		singlePointLabel?: string;
+	} = $props();
 
 	let mapContainer = $state<HTMLDivElement>();
 	let map: LeafletNS.Map | undefined;
@@ -29,7 +39,7 @@
 
 		if (points.length === 1) {
 			map.setView(points[0], 15);
-			L.marker(points[0], { interactive: false, keyboard: false, alt: 'Streckenpunkt' }).addTo(map);
+			L.marker(points[0], { interactive: false, keyboard: false, alt: singlePointLabel }).addTo(map);
 		} else {
 			const line = L.polyline(points, { color: '#1877f2', weight: 4 }).addTo(map);
 			L.marker(points[0], { interactive: false, keyboard: false, alt: 'Startpunkt' }).addTo(map);
@@ -48,7 +58,7 @@
 	});
 </script>
 
-<div class="track-map" bind:this={mapContainer} aria-label="Interaktive Streckenkarte"></div>
+<div class="track-map" bind:this={mapContainer} aria-label={containerLabel}></div>
 
 <style>
 	.track-map {

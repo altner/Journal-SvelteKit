@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import type { PageData } from './$types';
-	import PostCard from '$lib/components/PostCard.svelte';
+	import CheckinCard from '$lib/components/CheckinCard.svelte';
 	let { data }: { data: PageData } = $props();
 
 	let editing = $state(false);
@@ -24,7 +24,7 @@
 <div class="page">
 	<a class="back" href="/checkins">← Alle Checkins</a>
 
-	<PostCard
+	<CheckinCard
 		post={data.post}
 		priority
 		headingLevel={1}

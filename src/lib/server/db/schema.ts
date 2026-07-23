@@ -59,10 +59,6 @@ export const post = sqliteTable('post', {
 	// true only for auto-generated "photos added" posts (albums/[id] addPhotos action) —
 	// those stay deletable but not editable.
 	isStatusPost: integer('is_status_post', { mode: 'boolean' }).notNull().default(false),
-	// true only for posts created via the Micropub checkin endpoint (routes/api/micropub).
-	// Nullable, no default (like excludeFromStream/the GPS columns below) so `db:push` can only
-	// ever emit a lossless ADD COLUMN here — NULL means "not a checkin", same as false.
-	isCheckin: integer('is_checkin', { mode: 'boolean' }),
 	// GPS location, all nullable — a post can exist without one. Nullable, no default, so
 	// `db:push` can only ever emit a lossless ADD COLUMN for these (see CLAUDE.md: adding
 	// isStatusPost, a NOT NULL column even WITH a default, once made drizzle-kit propose
@@ -139,6 +135,68 @@ export const postTag = sqliteTable(
 	},
 	(t) => [unique('post_tag_post_id_tag_id_unique').on(t.postId, t.tagId)]
 );
+
+// ---------- Checkins ----------
+// Own table family (checkin/checkinBlock/checkinPhoto), deliberately mirroring
+// post/postBlock/photo rather than sharing them — a checkin has no data shape that differs from
+// a normal post's content model (same blocks/photos/slug scheme), but each area gets its own
+// table + components (see tasks/todo.md "Checkins: eigene Tabelle(n)"). No albumId/isStatusPost
+// here: checkins never create or contribute to albums. No tags either — checkins aren't tagged.
+
+export const checkin = sqliteTable('checkin', {
+	id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+	// optional manual override, set via the edit form — falls back to the auto "📍 Eingecheckt"
+	// title (see checkinTitle() in CheckinCard.svelte) when null.
+	title: text('title'),
+	slug: text('slug').unique(),
+	authorId: text('author_id')
+		.notNull()
+		.references(() => user.id, { onDelete: 'cascade' }),
+	// GPS location — always set for a checkin (unlike post's optional location), but kept
+	// nullable for the same db:push-losslessness reason as post's GPS columns.
+	latitude: real('latitude'),
+	longitude: real('longitude'),
+	locationPlace: text('location_place'), // city name via Nominatim, see routes/api/micropub
+	locationCountry: text('location_country'),
+	locationName: text('location_name'), // optional POI label, user-editable
+	// Full street address, all via Nominatim's reverse-geocode `address` object — nullable, no
+	// default (same db:push-losslessness reason as the GPS columns above). Kept separate from
+	// locationPlace (city) rather than folded together, since LocationPicker.svelte is shared with
+	// post's location feature and can't know which convention to apply.
+	road: text('road'),
+	houseNumber: text('house_number'),
+	postcode: text('postcode'),
+	createdAt: integer('created_at', { mode: 'timestamp' })
+		.notNull()
+		.$defaultFn(() => new Date())
+});
+
+export const checkinBlock = sqliteTable('checkin_block', {
+	id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+	checkinId: text('checkin_id')
+		.notNull()
+		.references(() => checkin.id, { onDelete: 'cascade' }),
+	position: integer('position').notNull(),
+	type: text('type', { enum: ['text', 'photos'] }).notNull(),
+	text: text('text')
+});
+
+export const checkinPhoto = sqliteTable('checkin_photo', {
+	id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+	filename: text('filename').notNull(),
+	originalName: text('original_name'),
+	width: integer('width'),
+	height: integer('height'),
+	checkinId: text('checkin_id')
+		.notNull()
+		.references(() => checkin.id, { onDelete: 'cascade' }),
+	blockId: text('block_id').references(() => checkinBlock.id, { onDelete: 'cascade' }),
+	excludeFromStream: integer('exclude_from_stream', { mode: 'boolean' }),
+	position: integer('position').notNull().default(0),
+	createdAt: integer('created_at', { mode: 'timestamp' })
+		.notNull()
+		.$defaultFn(() => new Date())
+});
 
 export const activity = sqliteTable('activity', {
 	id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
@@ -230,7 +288,8 @@ export const activityTag = sqliteTable(
 export const userRelations = relations(user, ({ many }) => ({
 	posts: many(post),
 	albums: many(album),
-	activities: many(activity)
+	activities: many(activity),
+	checkins: many(checkin)
 }));
 
 export const postRelations = relations(post, ({ one, many }) => ({
@@ -280,4 +339,20 @@ export const activityTagRelations = relations(activityTag, ({ one }) => ({
 export const postTagRelations = relations(postTag, ({ one }) => ({
 	post: one(post, { fields: [postTag.postId], references: [post.id] }),
 	tag: one(tag, { fields: [postTag.tagId], references: [tag.id] })
+}));
+
+export const checkinRelations = relations(checkin, ({ one, many }) => ({
+	author: one(user, { fields: [checkin.authorId], references: [user.id] }),
+	blocks: many(checkinBlock),
+	photos: many(checkinPhoto)
+}));
+
+export const checkinBlockRelations = relations(checkinBlock, ({ one, many }) => ({
+	checkin: one(checkin, { fields: [checkinBlock.checkinId], references: [checkin.id] }),
+	photos: many(checkinPhoto)
+}));
+
+export const checkinPhotoRelations = relations(checkinPhoto, ({ one }) => ({
+	checkin: one(checkin, { fields: [checkinPhoto.checkinId], references: [checkin.id] }),
+	block: one(checkinBlock, { fields: [checkinPhoto.blockId], references: [checkinBlock.id] })
 }));

@@ -1,6 +1,6 @@
 const INTERNAL_ORIGIN = 'https://achis.invalid';
 
-export const PROTECTED_PREFIXES = ['/posts/new'] as const;
+export const PROTECTED_PREFIXES = ['/posts/new', '/checkins/new'] as const;
 
 export function isProtectedPath(pathname: string) {
 	return PROTECTED_PREFIXES.some(

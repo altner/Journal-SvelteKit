@@ -6,7 +6,7 @@
 	type Photo = {
 		id: string;
 		filename: string;
-		postId: string;
+		checkinId: string;
 		width?: number | null;
 		height?: number | null;
 	};
@@ -16,7 +16,7 @@
 	const extra = $derived(photos.length - shown.length);
 
 	function hrefFor(photo: Photo) {
-		return `/posts/${photo.postId}/photo/${photo.id}`;
+		return `/checkins/${photo.checkinId}/photo/${photo.id}`;
 	}
 
 	function isPlainClick(e: MouseEvent) {

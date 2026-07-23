@@ -119,14 +119,18 @@
 			Über das in Abschnitt 5 beschriebene Login-Cookie hinaus setzt diese Website
 			<strong>keine weiteren Cookies</strong> und verwendet keine Tracking- oder
 			Analyse-Tools (z.B. Google Analytics, Matomo, Plausible). Es findet kein
-			websiteübergreifendes Tracking und keine Profilbildung statt. Für Besucherinnen und
-			Besucher, die diese Website nur lesen, werden keine Inhalte von Drittanbietern (z.B.
-			Karten, Videos, Schriftarten) von externen Servern nachgeladen. Beim Erstellen oder
-			Bearbeiten eines Beitrags kann der Betreiber optional einen Standort auf einer
-			interaktiven Kartenansicht (OpenStreetMap) auswählen; die dafür benötigten
-			Kartenkacheln werden in diesem Fall ausschließlich im Browser des Betreibers von
-			Servern der OpenStreetMap Foundation geladen — nie im Browser von Leserinnen und
-			Lesern. Näheres dazu in Abschnitt 8.
+			websiteübergreifendes Tracking und keine Profilbildung statt.
+		</p>
+		<p>
+			Eine Ausnahme betrifft eingebettete Kartenansichten: Die Detailseite einer Aktivität
+			(Streckenkarte) sowie die Detailseite eines Checkins (Standortkarte) binden eine
+			interaktive Karte (OpenStreetMap, dargestellt über die Bibliothek Leaflet) ein — dabei
+			werden Kartenkacheln direkt im Browser der jeweiligen Besucherin bzw. des Besuchers von
+			Servern der OpenStreetMap Foundation geladen, nicht nur beim Betreiber. Zusätzlich kann
+			der Betreiber beim Erstellen oder Bearbeiten eines Beitrags, einer Aktivität oder eines
+			Checkins optional einen Standort auf einer interaktiven Kartenansicht auswählen; die
+			dafür benötigten Kartenkacheln werden in diesem Fall ausschließlich im Browser des
+			Betreibers geladen. Näheres dazu in Abschnitt 8.
 		</p>
 
 		<hr />
@@ -138,19 +142,33 @@
 			technisch notwendige Verbindungsdaten verarbeitet, sowie des im Folgenden beschriebenen
 			Falls.
 		</p>
-		<p><strong>OpenStreetMap / Nominatim (Standort-Funktion)</strong></p>
+		<p><strong>OpenStreetMap / Nominatim / Overpass API (Standort-Funktion)</strong></p>
 		<p>
-			Wenn der Betreiber beim Erstellen oder Bearbeiten eines Beitrags einen Standort auf der
-			Karte auswählt, sendet der Server dieser Website die gewählten Koordinaten einmalig an
-			den Reverse-Geocoding-Dienst <strong>Nominatim</strong> der OpenStreetMap Foundation, um
-			daraus einen Orts- und Ländernamen zu ermitteln. Diese Abfrage erfolgt ausschließlich
-			serverseitig und ausschließlich beim aktiven Anlegen oder Ändern eines Standorts durch
-			den Betreiber — nicht automatisch und nicht beim Lesen eines Beitrags durch
-			Besucherinnen und Besucher. Die ermittelten Orts-, Land- und optionalen
-			Ortsnamen-Angaben werden dauerhaft beim jeweiligen Beitrag gespeichert und öffentlich
-			als reiner Text angezeigt (z.B. „📍 Dresden, Deutschland"); es wird zu keinem
-			Zeitpunkt eine interaktive Karte an Besucherinnen und Besucher ausgeliefert. Details zur
-			Datenverarbeitung durch die OpenStreetMap Foundation:
+			Wenn der Betreiber beim Erstellen oder Bearbeiten eines Beitrags, einer Aktivität oder
+			eines Checkins einen Standort auf der Karte auswählt, sendet der Server dieser Website
+			die gewählten Koordinaten einmalig an den Geocoding-Dienst <strong>Nominatim</strong> der
+			OpenStreetMap Foundation, um daraus einen Orts-, Länder- und optional vollständigen
+			Adressnamen zu ermitteln (Reverse-Geocoding), bzw. eine eingegebene Ortsbezeichnung an
+			Nominatims Namenssuche, um passende Orte samt Koordinaten vorzuschlagen. Zusätzlich kann
+			beim Setzen eines Standort-Markers eine Anfrage an die <strong>Overpass API</strong>
+			(ebenfalls OpenStreetMap-Rohdaten) gestellt werden, um benannte Orte im Umkreis von 100
+			Metern als Auswahlliste vorzuschlagen (z.B. ein Café oder eine Sehenswürdigkeit in der
+			Nähe). Diese Abfragen erfolgen ausschließlich serverseitig und ausschließlich beim
+			aktiven Anlegen oder Ändern eines Standorts durch den Betreiber — nicht automatisch und
+			nicht beim Lesen eines Beitrags durch Besucherinnen und Besucher. Die ermittelten Orts-,
+			Land-, Adress- und optionalen Ortsnamen-Angaben werden dauerhaft beim jeweiligen Beitrag
+			bzw. Checkin gespeichert und öffentlich als Text angezeigt (z.B. „📍 Dresden,
+			Deutschland").
+		</p>
+		<p>
+			Auf den Detailseiten von Aktivitäten und Checkins wird zusätzlich eine interaktive Karte
+			(OpenStreetMap-Kartenkacheln, dargestellt über die Bibliothek Leaflet) mit dem
+			jeweiligen Streckenverlauf bzw. Standort eingebettet. Anders als beim
+			Erstellen/Bearbeiten oben wird diese Karte jeder Besucherin und jedem Besucher der
+			jeweiligen Seite angezeigt, nicht nur dem Betreiber — die dafür nötigen Kartenkacheln
+			werden direkt im Browser der Lesenden von Servern der OpenStreetMap Foundation geladen.
+			Details zur Datenverarbeitung durch die OpenStreetMap Foundation (Nominatim, Overpass
+			und die Kartenkacheln sind alles Dienste des OpenStreetMap-Ökosystems):
 			<a
 				href="https://osmfoundation.org/wiki/Privacy_Policy"
 				target="_blank"

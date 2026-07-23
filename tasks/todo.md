@@ -1303,3 +1303,169 @@ plus neue Anforderung: Foto-Blöcke einzeln von `/photos`-Stream & Album ausschl
       Text bei reinem Text-Post speichern → Inline-Fehler; Status-Post zeigt kein
       "Bearbeiten"-Button, direkter POST an `?/edit` dafür → 403; ausgeloggt kein Button sichtbar,
       direkter POST ohne Session → 401
+
+## Checkins: eigene Tabelle(n) + eigene Komponenten
+
+Nutzerwunsch: jeder fachliche Bereich (Posts, Checkins, Activities, Albums) soll seine eigene
+Tabelle **und** eigene Komponenten haben. Activities/Albums erfüllen das schon, Checkins nicht
+(leben als `isCheckin`-Flag in `post`, nutzen `PostCard.svelte` mit). Trade-off bewusst in Kauf
+genommen: Checkins haben kein eigenes Datenmodell, teilen sich `post_block`/`photo`/`post_tag` 1:1
+mit normalen Posts — eine eigene Tabelle heißt volle Duplikation der Blocks-/Fotos-/Tags-/
+Slug-/Lösch-Logik (nach dem Vorbild `activity`/`ActivityPhotoGrid.svelte` vs.
+`post`/`PhotoGrid.svelte`). Vollständiger Plan: `/Users/adrian/.claude/plans/nifty-discovering-patterson.md`
+
+- [x] Schema: neue Tabellen `checkin`, `checkin_block`, `checkin_photo` + Relations;
+      `post.isCheckin`-Spalte entfernen (GPS-Felder bleiben auf `post`, normale Posts behalten
+      Standort-Feature). **Scope-Änderung während der Umsetzung:** `checkin_tag` wieder entfernt
+      — Nutzer entschied nachträglich, dass Checkins gar nicht taggable sein sollen, keine
+      `TagInput`/`setCheckinTags`/Tag-Anzeige für Checkins
+- [x] `scripts/migrate-checkins-to-own-table.mjs`: bestehende `isCheckin`-Posts (+ ihre Blocks/
+      Fotos) nach `checkin`/`checkin_block`/`checkin_photo` migrieren (gleiche IDs behalten),
+      danach alte Zeilen aus `post`/`post_block`/`photo`/`post_tag` löschen — lief gegen 0
+      bestehende Checkins in der lokalen Dev-DB, nur als Validierung
+- [x] `src/lib/server/checkins.ts` neu (mirrors `posts.ts`): `deleteCheckinCascade`,
+      `generateCheckinSlug`, `findCheckinBySlugOrId`
+- [x] `src/lib/server/checkinBlocks.ts` neu: `saveNewCheckinBlocks`, `reconcileEditedCheckinBlocks`
+      (generische Teile aus `blocks.ts` — `parseBlocksMeta`/`blocksMetaHasContent`/
+      `countNonExcludedNewFiles` — bleiben wiederverwendet, nicht dupliziert)
+- [x] `src/lib/server/checkinDetail.ts` neu (mirrors `postDetail.ts`, ohne `correctBase`-Dance —
+      die braucht's nicht mehr, eigene Tabelle statt geteiltem Namespace)
+- [x] Neue Komponenten: `CheckinCard.svelte`, `EditCheckinForm.svelte`,
+      `DeleteCheckinButton.svelte`, `CheckinPhotoGrid.svelte` (ohne Tag-UI, siehe Scope-Änderung)
+- [x] Routen: `routes/checkins/**` auf neue Module/Komponenten umgestellt;
+      `routes/api/micropub/+server.ts` auf `checkin`-Tabelle umgestellt;
+      `routes/posts/+page.server.ts` `notCheckin`-Filter entfernt;
+      `routes/+page.server.ts`/`+page.svelte` (Haupt-Feed) von 2-way auf 3-way-Merge
+      (post+activity+checkin) erweitert. `routes/tags/[tag]/**` bewusst NICHT erweitert — Checkins
+      sind nicht taggable, bleiben bei post+activity
+- [x] Aufräumen: `PostCard.svelte`/`postDetail.ts`/`DeletePostButton.svelte`/
+      `EditPostForm.svelte`/`PhotoGrid.svelte` — `isCheckin`/`basePath`-Verzweigung raus,
+      `postDetailLoad`/`postPhotoLoad` umbenannt (waren keine Factory-Funktionen mehr)
+- [x] `npm run check` — 0 Fehler
+- [x] DB-Migration verifiziert: neue Tabellen leer angelegt, `post.is_checkin`-Spalte per
+      `ALTER TABLE DROP COLUMN` entfernt (SQLite 3.51 unterstützt das direkt)
+- [x] Im Browser geprüft (temporärer Test-Checkin + temporärer Test-User, beide danach wieder
+      gelöscht): `/checkins`, Permalink, Foto-Lightbox-Fallback, Haupt-Feed-Einsortierung
+      (chronologisch korrekt zwischen Posts), `/posts` zeigt keine Checkins, Bearbeiten (Titel-
+      Update) und Löschen (Kaskade räumt checkin/checkin_block/checkin_photo korrekt auf)
+      funktionieren
+- [x] **Zwischenfall:** Test-Setup hat versehentlich eine echte Foto-Datei einer bestehenden
+      Post-Foto-Zeile wiederverwendet (`filename`-Kollision) — beim Löschen des Test-Checkins
+      wurde diese reale Datei mitgelöscht (Delete-Kaskade löscht jede DB-Zeile mit demselben
+      `filename`, nicht nur die Test-Zeile). Nutzer entschied: verwaiste `photo`-Zeile aus der DB
+      entfernt, restliche 8 Fotos des Volleyball-Posts unberührt. Lektion in `tasks/lessons.md`
+      festgehalten ("Test-Daten nie eine echte, bereits verlinkte Foto-Datei wiederverwenden").
+      **Zweiter Zwischenfall, selbe Session:** derselbe Lösch-Test hatte zusätzlich (unbemerkt bis
+      später) 6 echte, in Git getrackte Foto-Dateien des Volleyball-Status-Posts aus `uploads/`
+      entfernt (unklare Ursache, vermutlich ein früherer Testschritt in derselben Session) — per
+      `git checkout HEAD -- uploads/<datei>.jpg` wiederhergestellt, da glücklicherweise committed.
+
+## Checkins manuell hinzufügen + OSM-POI-Suche + Umkreis-Vorschlagsliste
+
+Nutzerwunsch: Checkins entstanden bisher ausschließlich über ein Apple Shortcut (Screenshot
+bestätigt: Apples eigene Maps-POI-Suche client-seitig in der Shortcuts-App, fertige Lat/Lon +
+Name gehen an `/api/micropub`). Es fehlte ein manueller Weg im Browser sowie jede Form von
+POI-Namenssuche gegen OpenStreetMap-Dienste im Code. Vollständiger Plan (bereits durch neuen
+Feature-Plan ersetzt): `/Users/adrian/.claude/plans/nifty-discovering-patterson.md`
+
+- [x] `src/lib/server/geocode.ts`: `searchPlaces` ergänzt (Nominatim `/search`, Namenssuche);
+      `src/routes/api/search-place/+server.ts` neu (auth-gated Proxy, mirrors reverse-geocode)
+- [x] `src/lib/components/LocationPicker.svelte`: Namens-Suchfeld mit Debounce/Abort + Ergebnisliste
+      ergänzt — kommt automatisch allen Konsumenten zugute (PostComposer, EditPostForm,
+      EditCheckinForm, neuer CheckinComposer), keine separate Checkin-only-Suchkomponente
+- [x] `src/lib/server/datetime.ts` neu: `resolveCreatedAt` aus `routes/posts/new/+page.server.ts`
+      extrahiert, von `routes/posts/new` und `routes/checkins/new` gemeinsam genutzt
+- [x] `src/lib/components/CheckinComposer.svelte` neu (mirrors `PostComposer.svelte`, ohne
+      Tags/Album-Felder — Checkins haben beides nicht)
+- [x] `src/routes/checkins/new/+page.server.ts` + `+page.svelte` neu: Auth-Guard-`load` (siehe
+      CLAUDE.md-Hinweis zu Routen ohne `load`), `default`-Action mit Pflicht-Standort
+      (`fail(400)` ohne Lat/Lon — anders als bei normalen Posts)
+- [x] `src/routes/checkins/+page.svelte`: "+ Checkin hinzufügen"-Link zu `/checkins/new`
+      (sichtbar nur eingeloggt), `PROTECTED_PREFIXES` in `src/lib/server/redirect.ts` um
+      `/checkins/new` ergänzt
+- [x] **Scope-Nachtrag (Nutzerwunsch):** Titel soll sich beim Anlegen automatisch aus dem POI
+      zusammensetzen ("📍 Eingecheckt: POI-Name", gleiches Muster wie `checkinTitle()` in
+      `CheckinCard.svelte`, jetzt aber tatsächlich persistiert statt nur zur Anzeigezeit berechnet)
+      — manuelles Titel-Eingabefeld aus `CheckinComposer.svelte` entfernt, Titel wird in
+      `routes/checkins/new/+page.server.ts`'s Action serverseitig aus `locationName` gebaut
+- [x] **Scope-Erweiterung (Nutzerwunsch, nach Rückfrage zu neuem externen Dienst bestätigt):**
+      Umkreis-Vorschlagsliste (100m) beim Setzen/Verschieben eines Markers oder "Meinen Standort
+      verwenden" — `src/lib/server/overpass.ts` neu (`findNearbyPlaces`, Overpass-API-Anfrage,
+      liefert benannte OSM-Punkte im Radius, was Nominatims `/reverse` nicht kann — der liefert nur
+      einen Treffer), `src/routes/api/nearby-places/+server.ts` neu (auth-gated Proxy),
+      `LocationPicker.svelte` um Vorschlagsliste erweitert (Klick auf Vorschlag setzt nur
+      `locationName`, Ort/Land bleiben vom parallel laufenden Reverse-Geocode)
+- [x] `src/routes/datenschutz/+page.svelte`: Abschnitt um Overpass API als zweiten externen
+      OpenStreetMap-Dienst ergänzt (Nominatim-Abschnitt zusätzlich auf "auch Namenssuche, nicht nur
+      Reverse-Geocoding" erweitert)
+- [x] `npm run check` — 0 Fehler
+- [x] Im Browser geprüft (temporäre Test-User, danach wieder gelöscht): POI-Namenssuche
+      ("Frauenkirche Dresden" → Ergebnis auswählen → Koordinaten/Ort/Land/Name korrekt befüllt),
+      kompletter manueller Checkin-Flow über `/checkins/new` (inkl. Server-Validierung ohne
+      Standort → `fail(400)`), Umkreis-Vorschlagsliste nach Kartenklick (echte Overpass-Treffer
+      "Sparkasse"/"Bahnhof Mitte / Jahnstraße" bei Dresden-Testkoordinaten, Klick setzt
+      `locationName` korrekt), danach vollständig aufgeräumt (Test-Checkins, Test-User, Sessions)
+- [x] Text/Foto nachträglich als komplett optional korrigiert (Nutzer-Feedback: "Bitte gib einen
+      Text ein oder füge mindestens ein Foto hinzu" kam auch mit gesetztem Standort) —
+      `blocksMetaHasContent`-Pflichtcheck aus `routes/checkins/new/+page.server.ts` und
+      `checkinDetailActions.edit` entfernt; ein Checkin kann jetzt rein mit Standort ohne
+      Text/Foto existieren
+- [x] Composer-Layout auf Nutzerfeedback angepasst: Standort jetzt standardmäßig aufgeklappt und
+      oben im Formular (neuer `startExpanded`-Prop an `LocationPicker.svelte`, nur von
+      `CheckinComposer` genutzt), Text/Foto zum aufklappbaren optionalen Abschnitt darunter
+      gemacht (`+ Text/Foto hinzufügen (optional)`-Toggle in `CheckinComposer.svelte`)
+- [x] `CheckinCard.svelte`-Spacing-Fix (Nutzerfeedback: "sieht noch etwas gedrungen aus"):
+      `.post-header` bekommt unten Padding wenn keine Blocks folgen (sonst wirkte ein
+      Text/Foto-loser Checkin unten abgeschnitten), `.post-sub` (Datum) hat jetzt
+      `margin-top: 4px` statt direkt am Titel zu kleben
+
+## Checkin-Layout: Adresse + eingebettete Karte (nach Facebook-Vorbild)
+
+Nutzerwunsch: Screenshot eines Facebook-Checkin-Layouts geteilt (großer Titel, grünes
+"Check-in"-Label + Datum + Ort, Box mit voller Adresse + eingebetteter interaktiver Karte).
+Zwei Kollisionen mit bestehenden Entscheidungen vorab geklärt (Nutzer hat beidem zugestimmt):
+1) Datenschutz-Seite behauptete "keine interaktive Karte für Besucher" — war bereits **faktisch
+   veraltet**, da `TrackMap.svelte` auf öffentlichen Activity-Detailseiten schon vorher echte
+   OSM-Kartenkacheln für jeden Besucher lädt (`routes/activities/[slug]/+page.server.ts` hat
+   keinen Auth-Check in `load`). 2) Volle Straßenadresse braucht neue Spalten (Nominatim liefert
+   die Daten beim Reverse-Geocoding schon, wurden aber bisher verworfen).
+
+- [x] Schema: `road`, `houseNumber`, `postcode` (nullable) auf `checkin` ergänzt, per
+      `ALTER TABLE` sicher nachgezogen (lokal + Kommentar aktualisiert)
+- [x] `geocode.ts`: `PlaceSearchResult`/`searchPlaces()` um dieselben drei Felder erweitert
+      (`reverseGeocode()`/`ReverseGeocodeResult` hatte sie schon)
+- [x] `routes/api/reverse-geocode/+server.ts`: Response um `road`/`houseNumber`/`postcode`
+      erweitert (wurden bisher von `reverseGeocode()` ermittelt, aber nie an den Client
+      durchgereicht)
+- [x] `routes/api/micropub/+server.ts`: Postcode-Faltung in `locationPlace` ("01067 Dresden")
+      entfernt — vereinheitlicht mit dem manuellen Erstellungsweg, `locationPlace` ist jetzt
+      überall nur der Stadtname, `postcode` lebt separat
+- [x] `LocationPicker.svelte`: `road`/`houseNumber`/`postcode`-State, aus Reverse-Geocode UND
+      Namenssuche übernommen, neue Text-Inputs ("Straße"/"Hausnummer"/"PLZ") + Hidden-Inputs;
+      harmlos für `post`-Formulare (die Felder einfach ignorieren, keine Schema-Änderung an
+      `post` nötig)
+- [x] `routes/checkins/new/+page.server.ts` + `checkinDetailActions.edit`: neue Felder aus
+      FormData übernehmen
+- [x] `TrackMap.svelte` (aus dem Activity-Feature) wiederverwendet statt neuer Komponente —
+      `points.length === 1` rendert schon einen einzelnen, nicht-interaktiven Marker ohne
+      Polyline. Zwei activity-spezifische Texte (`aria-label`, Marker-`alt`) zu optionalen Props
+      gemacht, damit `CheckinCard` sinnvollere Beschriftungen übergeben kann
+- [x] `CheckinCard.svelte`: neue `.checkin-meta`-Zeile (grünes "📍 Check-in"-Label · Datum · Ort)
+      ersetzt die alte `.post-sub`/`.post-location`-Kombi; neue `.checkin-address`-Box
+      (Straße+Hausnummer, PLZ+Ort) + eingebettete `TrackMap` darunter, wenn ein Standort gesetzt
+      ist. **Scope-Erweiterung während der Umsetzung (Nutzerfeedback):** ursprünglich nur für die
+      Detailseite (`headingLevel===1`) geplant, dann auf Nutzerwunsch für alle Checkin-Karten
+      vereinheitlicht (Liste `/checkins`, Feed, Detail) — jede Karte mit Standort bekommt jetzt
+      Badge+Adresse+eigene eingebettete Karte, analog zu `ActivityFeedCard`, die das für
+      Aktivitäten im Feed schon genauso macht
+- [x] `src/routes/datenschutz/+page.svelte`: Abschnitt 7+8 korrigiert — die Aussage "keine
+      Drittanbieter-Inhalte für rein lesende Besucher" war schon durch Activity-Streckenkarten
+      überholt; jetzt akkurat beschrieben, dass Activity- und Checkin-Detailseiten (und jetzt
+      auch alle Checkin-Karten) OSM-Kartenkacheln für alle Besucher laden, nicht nur beim
+      Erstellen/Bearbeiten durch den Betreiber
+- [x] `npm run check` — 0 Fehler
+- [x] Im Browser geprüft (temporärer Test-User, danach gelöscht): bestehender Checkin ohne
+      road/postcode zeigt weiterhin sinnvoll an (nur Ort, kein leerer Strich); neuer Checkin mit
+      POI-Suche ("Frauenkirche Dresden") zeigt korrekt "Neumarkt" / "01067 Dresden" + Karte;
+      Liste/Feed/Detail zeigen jetzt einheitlich Badge+Adresse+Karte; Zoom-Controls der
+      eingebetteten Karte funktionieren

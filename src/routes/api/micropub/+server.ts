@@ -3,10 +3,11 @@ import { randomUUID, timingSafeEqual } from 'node:crypto';
 import type { RequestHandler } from './$types';
 import { env } from '$env/dynamic/private';
 import { db } from '$lib/server/db';
-import { post, user } from '$lib/server/db/schema';
+import { checkin, user } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
-import { generatePostSlug } from '$lib/server/posts';
-import { saveNewPostBlocks, type BlockMeta } from '$lib/server/blocks';
+import { generateCheckinSlug } from '$lib/server/checkins';
+import { saveNewCheckinBlocks } from '$lib/server/checkinBlocks';
+import type { BlockMeta } from '$lib/server/blocks';
 import { reverseGeocode } from '$lib/server/geocode';
 
 // Own-Shortcut-only endpoint: authenticated with a single static bearer token from `.env`
@@ -60,43 +61,48 @@ export const POST: RequestHandler = async ({ request, url, fetch }) => {
 	const content = String(data.get('content') ?? '').trim();
 
 	// Best-effort, like the activity weather backfill — a Nominatim hiccup shouldn't fail the
-	// whole checkin, it just leaves place/country unset (same as a post created before this
+	// whole checkin, it just leaves the address fields unset (same as a post created before this
 	// existed, or an API outage).
 	let locationPlace: string | null = null;
 	let locationCountry: string | null = null;
+	let road: string | null = null;
+	let houseNumber: string | null = null;
+	let postcode: string | null = null;
 	try {
 		const geocoded = await reverseGeocode(latitude, longitude, fetch);
-		// Checkins show the postcode (unlike normal posts' city-only locationPlace) since the
-		// whole point is precisely where you checked in, not just the general area.
-		locationPlace = [geocoded.postcode, geocoded.place].filter(Boolean).join(' ') || null;
+		locationPlace = geocoded.place;
 		locationCountry = geocoded.country;
+		road = geocoded.road;
+		houseNumber = geocoded.houseNumber;
+		postcode = geocoded.postcode;
 	} catch {
-		// leave place/country unset
+		// leave address fields unset
 	}
 
 	const id = randomUUID();
-	const slug = await generatePostSlug(null, id);
+	const slug = await generateCheckinSlug(null, id);
 
-	await db.insert(post).values({
+	await db.insert(checkin).values({
 		id,
 		slug,
 		title: null,
 		authorId: owner.id,
-		isCheckin: true,
 		latitude,
 		longitude,
 		locationName: locationName || null,
 		locationPlace,
-		locationCountry
+		locationCountry,
+		road,
+		houseNumber,
+		postcode
 	});
 
-	// Reuses the same block-saving logic the normal composer uses (routes/posts/new) instead of
-	// duplicating photo-upload handling — a checkin is just a post with at most one text block and
-	// one photo block.
+	// A checkin is just at most one text block and one photo block — same block-saving logic the
+	// normal composer uses (routes/posts/new), just against checkin_block/checkin_photo.
 	const blocksMeta: BlockMeta[] = [];
 	if (content) blocksMeta.push({ id: randomUUID(), type: 'text', text: content });
 	blocksMeta.push({ id: randomUUID(), type: 'photos', fileField: 'photo', excludeFromStream: false });
-	await saveNewPostBlocks(id, blocksMeta, data);
+	await saveNewCheckinBlocks(id, blocksMeta, data);
 
 	return new Response(null, { status: 201, headers: { Location: `${url.origin}/checkins/${slug}` } });
 };

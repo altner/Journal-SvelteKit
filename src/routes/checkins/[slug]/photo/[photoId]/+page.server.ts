@@ -1,4 +1,4 @@
 import type { PageServerLoad } from './$types';
-import { createPostPhotoLoad } from '$lib/server/postDetail';
+import { checkinPhotoLoad } from '$lib/server/checkinDetail';
 
-export const load: PageServerLoad = createPostPhotoLoad('/checkins');
+export const load: PageServerLoad = checkinPhotoLoad;

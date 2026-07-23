@@ -8,96 +8,81 @@ import { setPostTags, parseTagsField } from '$lib/server/tags';
 import { parseBlocksMeta, reconcileEditedPostBlocks, blocksMetaHasContent } from '$lib/server/blocks';
 import { buildPostExcerpt, pickPostOgImage } from '$lib/server/seo';
 
-/** Shared between routes/posts/[slug] and routes/checkins/[slug] — same post detail behavior,
- *  just two different URL namespaces depending on `post.isCheckin`. A post resolved under the
- *  wrong namespace (e.g. a checkin hit via /posts/<slug>) 301-redirects to its correct namespace
- *  instead of 404ing, so old/shared links (and the pre-namespace-split Micropub Location header)
- *  keep working. */
-export function createPostDetailLoad(basePath: '/posts' | '/checkins') {
-	return async ({ params, url }: { params: { slug: string }; url: URL }) => {
-		const resolved = await findPostBySlugOrId(params.slug);
-		if (!resolved) throw error(404, 'Beitrag nicht gefunden');
+/** `/posts/[slug]` detail load. Checkins now live entirely under their own table + /checkins/...
+ *  namespace (see checkinDetail.ts) — no cross-namespace bridging needed here anymore. */
+export const postDetailLoad = async ({ params, url }: { params: { slug: string }; url: URL }) => {
+	const resolved = await findPostBySlugOrId(params.slug);
+	if (!resolved) throw error(404, 'Beitrag nicht gefunden');
 
-		const found = await db.query.post.findFirst({
-			where: eq(post.id, resolved.post.id),
-			with: {
-				blocks: {
-					orderBy: (block, { asc }) => asc(block.position),
-					with: { photos: { orderBy: (photo, { asc }) => asc(photo.position) } }
-				},
-				album: {
-					with: {
-						photos: { orderBy: (photo, { asc }) => asc(photo.position) }
-					}
-				},
-				tags: { with: { tag: true } }
-			}
-		});
-		if (!found) throw error(404, 'Beitrag nicht gefunden');
-
-		// Checkins and normal posts live in strictly separate URL namespaces — no bridging redirect
-		// between them, a checkin simply doesn't exist under /posts (and vice versa).
-		const correctBase = found.isCheckin ? '/checkins' : '/posts';
-		if (correctBase !== basePath) throw error(404, 'Beitrag nicht gefunden');
-		if (resolved.matchedBy === 'id' && found.slug) {
-			throw redirect(301, `${basePath}/${encodeURIComponent(found.slug)}`);
+	const found = await db.query.post.findFirst({
+		where: eq(post.id, resolved.post.id),
+		with: {
+			blocks: {
+				orderBy: (block, { asc }) => asc(block.position),
+				with: { photos: { orderBy: (photo, { asc }) => asc(photo.position) } }
+			},
+			album: {
+				with: {
+					photos: { orderBy: (photo, { asc }) => asc(photo.position) }
+				}
+			},
+			tags: { with: { tag: true } }
 		}
+	});
+	if (!found) throw error(404, 'Beitrag nicht gefunden');
 
-		const ogImageFilename = pickPostOgImage(found);
+	if (resolved.matchedBy === 'id' && found.slug) {
+		throw redirect(301, `/posts/${encodeURIComponent(found.slug)}`);
+	}
 
-		return {
-			post: { ...found, tags: found.tags.map((pt) => pt.tag) },
-			description: buildPostExcerpt(found.blocks),
-			canonicalUrl: `${url.origin}${basePath}/${found.slug}`,
-			ogImage: ogImageFilename ? `${url.origin}/uploads/${ogImageFilename}` : null
-		};
+	const ogImageFilename = pickPostOgImage(found);
+
+	return {
+		post: { ...found, tags: found.tags.map((pt) => pt.tag) },
+		description: buildPostExcerpt(found.blocks),
+		canonicalUrl: `${url.origin}/posts/${found.slug}`,
+		ogImage: ogImageFilename ? `${url.origin}/uploads/${ogImageFilename}` : null
 	};
-}
+};
 
-/** Shared between routes/posts/[slug]/photo/[photoId] and routes/checkins/[slug]/photo/[photoId]
- *  — the standalone lightbox fallback page for a post's own photo stream (see CLAUDE.md's
- *  "post-scoped" deep-link context). Same wrong-namespace redirect behavior as
- *  createPostDetailLoad above. */
-export function createPostPhotoLoad(basePath: '/posts' | '/checkins') {
-	return async ({
-		params,
-		url
-	}: {
-		params: { slug: string; photoId: string };
-		url: URL;
-	}) => {
-		const resolved = await findPostBySlugOrId(params.slug);
-		if (!resolved) throw error(404, 'Beitrag nicht gefunden');
+/** `/posts/[slug]/photo/[photoId]` standalone lightbox fallback load (see CLAUDE.md's
+ *  "post-scoped" deep-link context). */
+export const postPhotoLoad = async ({
+	params,
+	url
+}: {
+	params: { slug: string; photoId: string };
+	url: URL;
+}) => {
+	const resolved = await findPostBySlugOrId(params.slug);
+	if (!resolved) throw error(404, 'Beitrag nicht gefunden');
 
-		const found = await db.query.post.findFirst({
-			where: eq(post.id, resolved.post.id),
-			with: {
-				photos: { orderBy: (photo, { asc }) => asc(photo.position) },
-				blocks: { orderBy: (block, { asc }) => asc(block.position) }
-			}
-		});
-		if (!found) throw error(404, 'Beitrag nicht gefunden');
-
-		const correctBase = found.isCheckin ? '/checkins' : '/posts';
-		if (correctBase !== basePath) throw error(404, 'Beitrag nicht gefunden');
-		if (resolved.matchedBy === 'id' && found.slug) {
-			throw redirect(301, `${basePath}/${encodeURIComponent(found.slug)}/photo/${params.photoId}`);
+	const found = await db.query.post.findFirst({
+		where: eq(post.id, resolved.post.id),
+		with: {
+			photos: { orderBy: (photo, { asc }) => asc(photo.position) },
+			blocks: { orderBy: (block, { asc }) => asc(block.position) }
 		}
+	});
+	if (!found) throw error(404, 'Beitrag nicht gefunden');
 
-		const index = found.photos.findIndex((p) => p.id === params.photoId);
-		if (index === -1) throw error(404, 'Foto nicht gefunden');
+	if (resolved.matchedBy === 'id' && found.slug) {
+		throw redirect(301, `/posts/${encodeURIComponent(found.slug)}/photo/${params.photoId}`);
+	}
 
-		const photo = found.photos[index];
+	const index = found.photos.findIndex((p) => p.id === params.photoId);
+	if (index === -1) throw error(404, 'Foto nicht gefunden');
 
-		return {
-			post: found,
-			index,
-			description: buildPostExcerpt(found.blocks),
-			canonicalUrl: `${url.origin}${basePath}/${found.slug}/photo/${photo.id}`,
-			ogImage: `${url.origin}/uploads/${photo.filename}`
-		};
+	const photo = found.photos[index];
+
+	return {
+		post: found,
+		index,
+		description: buildPostExcerpt(found.blocks),
+		canonicalUrl: `${url.origin}/posts/${found.slug}/photo/${photo.id}`,
+		ogImage: `${url.origin}/uploads/${photo.filename}`
 	};
-}
+};
 
 export const postDetailActions: Actions = {
 	delete: async ({ params, locals }) => {

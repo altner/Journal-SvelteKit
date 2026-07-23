@@ -1,5 +1,5 @@
 import type { PageServerLoad, Actions } from './$types';
-import { createPostDetailLoad, postDetailActions } from '$lib/server/postDetail';
+import { checkinDetailLoad, checkinDetailActions } from '$lib/server/checkinDetail';
 
-export const load: PageServerLoad = createPostDetailLoad('/checkins');
-export const actions: Actions = postDetailActions;
+export const load: PageServerLoad = checkinDetailLoad;
+export const actions: Actions = checkinDetailActions;

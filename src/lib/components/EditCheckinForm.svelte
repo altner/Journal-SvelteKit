@@ -1,21 +1,19 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { beforeNavigate } from '$app/navigation';
-	import TagInput from './TagInput.svelte';
 	import LocationPicker from './LocationPicker.svelte';
 	import BlockEditor from './BlockEditor.svelte';
 	import { onMount, tick } from 'svelte';
 
 	let {
-		postSlug,
+		checkinSlug,
 		title,
 		blocks,
-		tags = [],
 		location = null,
 		onSaved,
 		onCancel
 	}: {
-		postSlug: string;
+		checkinSlug: string;
 		title: string | null;
 		blocks: (
 			| { id: string; type: 'text'; text: string }
@@ -26,13 +24,15 @@
 					excludeFromStream: boolean;
 			  }
 		)[];
-		tags?: string[];
 		location?: {
 			latitude: number;
 			longitude: number;
 			locationPlace: string | null;
 			locationCountry: string | null;
 			locationName: string | null;
+			road: string | null;
+			houseNumber: string | null;
+			postcode: string | null;
 		} | null;
 		onSaved?: () => void;
 		onCancel?: () => void;
@@ -64,7 +64,7 @@
 
 <form
 	method="POST"
-	action="/posts/{postSlug}?/edit"
+	action="/checkins/{checkinSlug}?/edit"
 	enctype="multipart/form-data"
 	class="edit-form"
 	aria-busy={submitting}
@@ -81,7 +81,7 @@
 				return;
 			}
 			if (result.type === 'error') {
-				error = 'Der Beitrag konnte nicht gespeichert werden. Bitte versuche es erneut.';
+				error = 'Der Checkin konnte nicht gespeichert werden. Bitte versuche es erneut.';
 				submitting = false;
 				await tick();
 				errorMessage?.focus();
@@ -103,8 +103,6 @@
 	</label>
 
 	<BlockEditor initialBlocks={blocks} />
-
-	<TagInput name="tags" initialTags={tags} />
 
 	<LocationPicker initialLocation={location} onChange={() => (dirty = true)} />
 

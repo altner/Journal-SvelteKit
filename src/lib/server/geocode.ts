@@ -43,3 +43,46 @@ export async function reverseGeocode(
 
 	return { place, country, poiName, road, houseNumber, postcode };
 }
+
+export type PlaceSearchResult = {
+	label: string; // full Nominatim display_name, shown in the result list
+	place: string | null;
+	country: string | null;
+	poiName: string | null;
+	road: string | null;
+	houseNumber: string | null;
+	postcode: string | null;
+	latitude: number;
+	longitude: number;
+};
+
+/** Forward-geocodes a free-text query (POI/address name) via Nominatim's `/search` endpoint —
+ *  the counterpart to reverseGeocode above. Same rate-limit/auth-gating caveat applies (see
+ *  routes/api/search-place's own auth check). Throws on network failure or non-OK response. */
+export async function searchPlaces(
+	query: string,
+	fetchFn: typeof fetch = fetch
+): Promise<PlaceSearchResult[]> {
+	const nominatimUrl =
+		`https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(query)}` +
+		`&addressdetails=1&limit=5`;
+
+	const res = await fetchFn(nominatimUrl, { headers: { 'User-Agent': USER_AGENT } });
+	if (!res.ok) throw new Error(`Nominatim-Fehler (${res.status}).`);
+
+	const data = await res.json();
+	return (data as any[]).map((item) => {
+		const address = item.address ?? {};
+		return {
+			label: item.display_name,
+			place: address.city ?? address.town ?? address.village ?? null,
+			country: address.country ?? null,
+			poiName: item.name || address.amenity || null,
+			road: address.road ?? null,
+			houseNumber: address.house_number ?? null,
+			postcode: address.postcode ?? null,
+			latitude: Number(item.lat),
+			longitude: Number(item.lon)
+		};
+	});
+}

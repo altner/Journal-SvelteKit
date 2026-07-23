@@ -23,8 +23,8 @@ export const GET: RequestHandler = async ({ url, locals, fetch }) => {
 	}
 
 	try {
-		const { place, country, poiName } = await reverseGeocode(lat, lon, fetch);
-		return json({ place, country, poiName });
+		const { place, country, poiName, road, houseNumber, postcode } = await reverseGeocode(lat, lon, fetch);
+		return json({ place, country, poiName, road, houseNumber, postcode });
 	} catch {
 		return json({ error: 'Nominatim ist nicht erreichbar.' }, { status: 502 });
 	}

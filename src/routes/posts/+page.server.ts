@@ -11,12 +11,13 @@ export const load: PageServerLoad = async ({ url }) => {
 			? or(lt(post.createdAt, cursor.date), and(eq(post.createdAt, cursor.date), lt(post.id, cursor.id)))
 			: or(gt(post.createdAt, cursor.date), and(eq(post.createdAt, cursor.date), gt(post.id, cursor.id)))
 		: undefined;
-	// "Beiträge" is for user-authored posts — checkins get their own /checkins listing (like
-	// isStatusPost's "photos added" posts are excluded from being edit-worthy, checkins are
-	// excluded from being counted as a Beitrag here), but stay visible in the main Feed.
-	const notCheckin = or(isNull(post.isCheckin), eq(post.isCheckin, false));
+	// "Beiträge" is for standalone, user-authored posts — any post tied to an album (the origin
+	// post that created it, or a later isStatusPost "photos added" post) lives under /albums/...
+	// instead, so it's excluded here (but stays visible in the main Feed). Checkins have their own
+	// table entirely now (see routes/checkins), so no filter is needed for them anymore.
+	const beitragFilter = isNull(post.albumId);
 	const posts = await db.query.post.findMany({
-		where: cursorWhere ? and(notCheckin, cursorWhere) : notCheckin,
+		where: cursorWhere ? and(beitragFilter, cursorWhere) : beitragFilter,
 		orderBy: cursor?.direction === 'after'
 			? [asc(post.createdAt), asc(post.id)]
 			: [desc(post.createdAt), desc(post.id)],

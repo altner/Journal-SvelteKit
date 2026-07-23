@@ -1,5 +1,5 @@
 import type { PageServerLoad, Actions } from './$types';
-import { createPostDetailLoad, postDetailActions } from '$lib/server/postDetail';
+import { postDetailLoad, postDetailActions } from '$lib/server/postDetail';
 
-export const load: PageServerLoad = createPostDetailLoad('/posts');
+export const load: PageServerLoad = postDetailLoad;
 export const actions: Actions = postDetailActions;

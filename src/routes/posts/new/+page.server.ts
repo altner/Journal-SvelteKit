@@ -5,6 +5,7 @@ import { album, photo, post } from '$lib/server/db/schema';
 import { setPostTags, parseTagsField } from '$lib/server/tags';
 import { generatePostSlug } from '$lib/server/posts';
 import { generateAlbumSlug } from '$lib/server/albums';
+import { resolveCreatedAt } from '$lib/server/datetime';
 import {
 	parseBlocksMeta,
 	saveNewPostBlocks,
@@ -13,33 +14,6 @@ import {
 } from '$lib/server/blocks';
 import { eq, inArray } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
-
-// Nimmt die optionalen "date"/"time"-Felder (YYYY-MM-DD / HH:MM, z.B. für nachträglich
-// hochgeladene ältere Fotos) und kombiniert sie. Ohne gültiges Datum: jetzt. Mit Datum aber ohne
-// gültige Uhrzeit: aktuelle Uhrzeit (Fallback, wie zuvor), damit mehrere am selben Tag
-// rückdatierte Posts trotzdem in Einreihenfolge sortiert bleiben.
-function resolveCreatedAt(dateInput: string, timeInput: string): Date {
-	const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateInput);
-	const now = new Date();
-	if (!dateMatch) return now;
-
-	const timeMatch = /^(\d{2}):(\d{2})$/.exec(timeInput);
-	const [hours, minutes] = timeMatch
-		? [Number(timeMatch[1]), Number(timeMatch[2])]
-		: [now.getHours(), now.getMinutes()];
-
-	const [, year, month, day] = dateMatch;
-	const combined = new Date(
-		Number(year),
-		Number(month) - 1,
-		Number(day),
-		hours,
-		minutes,
-		now.getSeconds(),
-		now.getMilliseconds()
-	);
-	return Number.isNaN(combined.getTime()) ? now : combined;
-}
 
 // Ohne diese load-Funktion macht SvelteKit bei einer Client-Side-Navigation zu dieser Route
 // (z.B. per <a href="/posts/new">) keinen Server-Request, wenn es nichts zu laden gibt — der

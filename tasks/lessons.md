@@ -82,3 +82,16 @@ Hauptspalte plus rechte Leiste wäre seine optische Mitte gegenüber der gesamte
 - Bei einer zweistufigen Inline-Bestätigung ist der erste Auslöser immer `type="button"`. Nur der
   ausdrücklich bestätigende zweite Button darf das Formular absenden; so kann die Löschung auch
   vor der Hydrierung nicht versehentlich ohne Bestätigung ausgelöst werden.
+
+## Test-Daten nie eine echte, bereits verlinkte Foto-Datei wiederverwenden
+
+Beim Verifizieren des Checkin-Löschens wurde testweise ein `checkin_photo`-Datensatz mit dem
+`filename` eines bereits existierenden, echten Fotos (Volleyball-Post) angelegt, statt eine eigene
+Test-Datei hochzuladen. Der reguläre Lösch-Kaskaden-Code (`deleteCheckinCascade`/
+`deletePostCascade`) löscht beim Löschen korrekt auch die Datei auf der Platte via
+`deleteUploadedPhoto` — das betrifft dann aber **jede** DB-Zeile mit demselben `filename`, nicht
+nur die Test-Zeile. Ergebnis: eine echte Foto-Datei wurde von der Platte gelöscht, obwohl nur der
+Test-Checkin gelöscht werden sollte. Für Foto-bezogene Testdaten (egal ob Post, Checkin, Activity)
+immer eine eigene, für den Test angelegte Datei in `uploads/` verwenden (oder eine Kopie einer
+bestehenden Datei unter neuem Namen) — nie einen bestehenden `filename`-Wert aus der DB
+wiederverwenden, auch nicht "nur zum Anzeigen".

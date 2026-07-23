@@ -1,12 +1,13 @@
 <script lang="ts">
-	import PhotoGrid from './PhotoGrid.svelte';
-	import DeletePostButton from './DeletePostButton.svelte';
-	import EditPostForm from './EditPostForm.svelte';
+	import CheckinPhotoGrid from './CheckinPhotoGrid.svelte';
+	import DeleteCheckinButton from './DeleteCheckinButton.svelte';
+	import EditCheckinForm from './EditCheckinForm.svelte';
 	import OwnerActions from './OwnerActions.svelte';
+	import TrackMap from './TrackMap.svelte';
 	import { renderMarkdownToSafeHtml } from '$lib/markdown';
 	import { tick } from 'svelte';
 
-	type Photo = { id: string; filename: string; postId: string; excludeFromStream: boolean | null; width: number | null; height: number | null };
+	type Photo = { id: string; filename: string; checkinId: string; excludeFromStream: boolean | null; width: number | null; height: number | null };
 	type Block =
 		| { id: string; type: 'text'; text: string | null; photos: Photo[] }
 		| { id: string; type: 'photos'; text: string | null; photos: Photo[] };
@@ -26,22 +27,16 @@
 			slug: string | null;
 			title: string | null;
 			createdAt: Date | string;
-			isStatusPost: boolean;
 			anchorId?: string | null;
 			blocks: Block[];
-			album: {
-				id: string;
-				slug: string | null;
-				title: string;
-				originPostId: string | null;
-				photos: { id: string; filename: string; postId: string; width: number | null; height: number | null }[];
-			} | null;
-			tags: { id: string; name: string; slug: string }[];
 			latitude: number | null;
 			longitude: number | null;
 			locationPlace: string | null;
 			locationCountry: string | null;
 			locationName: string | null;
+			road: string | null;
+			houseNumber: string | null;
+			postcode: string | null;
 		};
 		user: App.Locals['user'];
 		editing?: boolean;
@@ -62,23 +57,19 @@
 		});
 	}
 
+	// Checkins never repeat the location name in the pill — it's already shown in the title via
+	// checkinTitle() below, so only place+country are shown here.
 	function formatLocation(p: {
-		locationName: string | null;
 		locationPlace: string | null;
 		locationCountry: string | null;
 	}) {
-		const placeAndCountry = [p.locationPlace, p.locationCountry].filter(Boolean).join(', ');
-		return [p.locationName, placeAndCountry].filter(Boolean).join(' · ');
+		return [p.locationPlace, p.locationCountry].filter(Boolean).join(', ');
 	}
 
-	function isExcludedBlock(block: Block) {
-		return block.type === 'photos' && block.photos.length > 0 && block.photos.every((p) => !!p.excludeFromStream);
+	function checkinTitle(p: { locationName: string | null }) {
+		return p.locationName ? `Eingecheckt: ${p.locationName}` : 'Eingecheckt';
 	}
 
-	const isOrigin = $derived(post.album != null && post.album.originPostId === post.id);
-	const firstAlbumBlockId = $derived(
-		isOrigin ? post.blocks.find((b) => b.type === 'photos' && !isExcludedBlock(b))?.id ?? null : null
-	);
 	const firstVisiblePhotoBlockId = $derived(
 		post.blocks.find((block) => block.type === 'photos' && block.photos.length > 0)?.id ?? null
 	);
@@ -92,7 +83,7 @@
 						id: b.id,
 						type: 'photos' as const,
 						photos: b.photos,
-						excludeFromStream: isExcludedBlock(b)
+						excludeFromStream: b.photos.length > 0 && b.photos.every((p) => !!p.excludeFromStream)
 					}
 		);
 	}
@@ -105,68 +96,67 @@
 	async function finishEditing() {
 		onEditDone?.();
 		await tick();
-		articleElement?.querySelector<HTMLElement>('summary[aria-label="Beitragsaktionen"]')?.focus();
+		articleElement?.querySelector<HTMLElement>('summary[aria-label="Checkin-Aktionen"]')?.focus();
 	}
 </script>
 
 <article bind:this={articleElement} class="card post" id={post.anchorId ?? undefined}>
-	<div class="post-header">
+	<div class="post-header" class:standalone={post.blocks.length === 0 && !editing}>
 		<div class="post-meta">
 			{#if headingLevel === 1}
-				<h1 class="post-title detail-title">{post.title || 'Ohne Titel'}</h1>
+				<h1 class="post-title detail-title">{post.title || checkinTitle(post)}</h1>
 			{:else if !editing}
-					<h2 class="post-title">
-						{#if post.album}
-							<a href="/albums/{post.album.slug ?? post.album.id}">{post.title || 'Ohne Titel'}</a>
-						{:else}
-							<a href="/posts/{post.slug ?? post.id}">{post.title || 'Ohne Titel'}</a>
-						{/if}
-					</h2>
+				<h2 class="post-title"><a href="/checkins/{post.slug ?? post.id}">{post.title || checkinTitle(post)}</a></h2>
 			{/if}
-			<div class="post-sub">
+			<div class="checkin-meta">
+				<span class="checkin-badge">📍 Check-in</span>
+				<span>·</span>
 				<span>{formatDate(post.createdAt)}</span>
+				{#if post.locationPlace || post.locationCountry}
+					<span>·</span>
+					<span>📍 {formatLocation(post)}</span>
+				{/if}
 			</div>
-			{#if post.latitude != null && post.longitude != null}
-				<div class="post-location">
-					<a
-						class="location-pill"
-						href={`https://www.openstreetmap.org/?mlat=${post.latitude}&mlon=${post.longitude}#map=16/${post.latitude}/${post.longitude}`}
-						target="_blank"
-						rel="noopener noreferrer">📍 {formatLocation(post)}</a
-					>
-				</div>
-			{/if}
-			{#if post.tags.length > 0}
-				<div class="post-tags">
-					{#each post.tags as t (t.id)}
-						<a class="tag-pill" href="/tags/{t.slug}">{t.name}</a>
-					{/each}
-				</div>
-			{/if}
 		</div>
 		{#if user}
-			<OwnerActions label="Beitragsaktionen">
-				{#if !post.isStatusPost && !editing}
+			<OwnerActions label="Checkin-Aktionen">
+				{#if !editing}
 					<button type="button" class="edit-btn" onclick={startEditing}>Bearbeiten</button>
 				{/if}
-				<DeletePostButton postSlug={post.slug ?? post.id} {afterDelete} />
+				<DeleteCheckinButton checkinSlug={post.slug ?? post.id} {afterDelete} />
 			</OwnerActions>
 		{/if}
 	</div>
 
+	{#if post.latitude != null && post.longitude != null}
+		<div class="checkin-address">
+			{#if post.road}<p>{post.road}{post.houseNumber ? ` ${post.houseNumber}` : ''}</p>{/if}
+			{#if post.postcode || post.locationPlace}
+				<p>{[post.postcode, post.locationPlace].filter(Boolean).join(' ')}</p>
+			{/if}
+		</div>
+		<TrackMap
+			points={[[post.latitude, post.longitude]]}
+			containerLabel="Interaktive Standortkarte"
+			singlePointLabel="Checkin-Standort"
+		/>
+	{/if}
+
 	{#if editing}
-		<EditPostForm
-			postSlug={post.slug ?? post.id}
+		<EditCheckinForm
+			checkinSlug={post.slug ?? post.id}
 			title={post.title}
 			blocks={editableBlocks()}
-			tags={post.tags.map((t) => t.name)}
 			location={post.latitude != null && post.longitude != null
 				? {
 						latitude: post.latitude,
 						longitude: post.longitude,
 						locationPlace: post.locationPlace,
 						locationCountry: post.locationCountry,
-						locationName: post.locationName
+						locationName: post.locationName,
+						road: post.road,
+						houseNumber: post.houseNumber,
+						postcode: post.postcode
 					}
 				: null}
 			onSaved={finishEditing}
@@ -178,10 +168,8 @@
 				{#if block.text?.trim()}
 					<div class="post-text">{@html renderMarkdownToSafeHtml(block.text)}</div>
 				{/if}
-			{:else if block.id === firstAlbumBlockId}
-				<PhotoGrid photos={post.album?.photos ?? []} priority={priority && block.id === firstVisiblePhotoBlockId} />
-			{:else if !(isOrigin && !isExcludedBlock(block))}
-				<PhotoGrid photos={block.photos} priority={priority && block.id === firstVisiblePhotoBlockId} />
+			{:else}
+				<CheckinPhotoGrid photos={block.photos} priority={priority && block.id === firstVisiblePhotoBlockId} />
 			{/if}
 		{/each}
 	{/if}
@@ -193,6 +181,11 @@
 		align-items: flex-start;
 		gap: 8px;
 		padding: 12px 16px 0 16px;
+	}
+	/* A checkin with no text/photo blocks has nothing after the header to give the card its
+	   bottom breathing room — add it here instead so a content-less checkin doesn't look cut off. */
+	.post-header.standalone {
+		padding-bottom: 12px;
 	}
 	.post-meta {
 		flex: 1;
@@ -225,13 +218,6 @@
 	.post-title a:hover {
 		text-decoration: underline;
 	}
-	.post-sub {
-		display: flex;
-		align-items: center;
-		gap: 4px;
-		font-size: 13px;
-		color: var(--fb-gray);
-	}
 	.post-text {
 		padding: 12px 16px;
 		font-size: 15px;
@@ -257,36 +243,26 @@
 	.post-text :global(a) {
 		color: var(--fb-blue);
 	}
-	.post-location {
-		margin-top: 4px;
-	}
-	.location-pill {
-		color: var(--fb-gray);
-		font-size: 12px;
-	}
-	.location-pill:hover {
-		color: var(--fb-blue);
-		text-decoration: underline;
-	}
-	.post-tags {
+	.checkin-meta {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 6px;
-		margin-top: 4px;
-	}
-	.tag-pill {
-		display: inline-flex;
 		align-items: center;
-		min-height: 44px;
-		background: var(--fb-hover);
-		color: var(--fb-blue);
-		font-size: 12px;
-		font-weight: 600;
-		padding: 6px 12px;
-		border-radius: 22px;
-		text-decoration: none;
+		gap: 6px;
+		margin-top: 6px;
+		font-size: 13px;
+		color: var(--fb-gray);
 	}
-	.tag-pill:hover {
-		background: var(--fb-border);
+	.checkin-badge {
+		font-weight: 600;
+		color: #31a24c;
+	}
+	.checkin-address {
+		padding: 12px 16px;
+		font-size: 14px;
+		line-height: 1.4;
+		color: var(--fb-gray);
+	}
+	.checkin-address p {
+		margin: 0;
 	}
 </style>

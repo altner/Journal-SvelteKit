@@ -48,6 +48,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
 	// Same merge-by-"when did this happen" approach as the main feed (/routes/+page.server.ts) —
 	// a tag page is really just the main feed filtered down to one tag, so it should read the
 	// same way: one chronological stream, not posts-then-activities in two separate blocks.
+	// Checkins aren't tagged (no checkin_tag table), so they never appear here.
 	type TagItem =
 		| { kind: 'post'; sortDate: Date; post: (typeof posts)[number] }
 		| { kind: 'activity'; sortDate: Date; activity: (typeof activities)[number] };

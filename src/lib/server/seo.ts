@@ -43,3 +43,15 @@ export function pickPostOgImage(post: {
 	}
 	return null;
 }
+
+/** Picks the filename of the photo to use as a checkin's og:image — same "first photo of the
+ *  first photos-block" rule as pickPostOgImage, minus the album special-case (checkins never
+ *  create or contribute to albums). */
+export function pickCheckinOgImage(checkin: {
+	blocks: { type: string; photos: { filename: string }[] }[];
+}): string | null {
+	for (const block of checkin.blocks) {
+		if (block.type === 'photos' && block.photos.length > 0) return block.photos[0].filename;
+	}
+	return null;
+}

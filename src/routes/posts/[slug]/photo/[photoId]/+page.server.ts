@@ -1,4 +1,4 @@
 import type { PageServerLoad } from './$types';
-import { createPostPhotoLoad } from '$lib/server/postDetail';
+import { postPhotoLoad } from '$lib/server/postDetail';
 
-export const load: PageServerLoad = createPostPhotoLoad('/posts');
+export const load: PageServerLoad = postPhotoLoad;
