@@ -1,7 +1,8 @@
 import { db } from '$lib/server/db';
-import { eq } from 'drizzle-orm';
-import { album } from '$lib/server/db/schema';
+import { eq, inArray } from 'drizzle-orm';
+import { album, photo, post } from '$lib/server/db/schema';
 import { slugify } from '$lib/server/slug';
+import { randomUUID } from 'node:crypto';
 
 /** Generates a unique URL slug for a new album — same scheme as generatePostSlug in posts.ts.
  *  Album titles are required (not nullable), so the id-fallback branch only matters for the rare
@@ -15,6 +16,38 @@ export async function generateAlbumSlug(title: string, id: string): Promise<stri
 		candidate = `${base}-${n++}`;
 	}
 	return candidate;
+}
+
+/** Creates an album from an already-existing post's photos, linking both the post and the given
+ *  photos to it — the same insert/link sequence `routes/posts/new/+page.server.ts`'s action does
+ *  inline for the web composer's "save as album" checkbox, extracted here so the Micropub endpoint
+ *  can reuse it too. Deliberately not retrofitted into the other 2-3 existing album-creation call
+ *  sites (routes/posts/new, routes/albums, routes/photos) — those are working, tested code with
+ *  their own slightly different trigger conditions; no requirement to touch them right now. */
+export async function createAlbumFromPost(
+	postId: string,
+	info: { title: string; description: string | null },
+	photoIds: string[],
+	authorId: string,
+	createdAt: Date
+): Promise<{ albumId: string; albumSlug: string }> {
+	const albumId = randomUUID();
+	const albumSlug = await generateAlbumSlug(info.title, albumId);
+
+	await db.insert(album).values({
+		id: albumId,
+		slug: albumSlug,
+		title: info.title,
+		description: info.description,
+		originPostId: postId,
+		authorId,
+		createdAt
+	});
+
+	await db.update(post).set({ albumId }).where(eq(post.id, postId));
+	await db.update(photo).set({ albumId }).where(inArray(photo.id, photoIds));
+
+	return { albumId, albumSlug };
 }
 
 /** Resolves a `/albums/[slug]` route param to an album, trying the slug first and falling back to

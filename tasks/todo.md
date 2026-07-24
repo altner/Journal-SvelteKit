@@ -1,5 +1,79 @@
 # Todo
 
+## Micropub-Endpoint in drei getrennte Endpunkte aufgespalten — erledigt
+
+Nutzerkritik am vorherigen Single-Endpoint-Dispatch (ein `/api/micropub`, das per Feld-Präsenz
+zwischen Checkin/Post/Post+Album unterschied): "halbherzig und maximal fehleranfällig ohne eigene
+API-Endpunkte für jeden Bereich" — zu Recht inkonsistent mit dem längst etablierten Prinzip, dass
+jeder fachliche Bereich seine eigene Tabelle **und** eigenen Komponenten bekommt (siehe "Checkins:
+eigene Tabelle(n)"-Eintrag). Feld-Präsenz-Dispatch ist implizite Logik, die bei einem vergessenen
+Feld oder Tippfehler im Shortcut leise in den falschen Zweig mit falschen Regeln rutschen kann.
+
+- [x] `src/lib/server/micropubAuth.ts` neu: `authorizeMicropubRequest(request, data)` — Bearer-
+      Token-Check + `h=entry`-Check + Owner-Lookup, von allen drei Endpunkten geteilt (einzige
+      verbleibende geteilte Logik, reine Auth, kein Business-Logic-Dispatch mehr)
+- [x] `src/routes/api/micropub/checkin/+server.ts` neu (1:1 der alte Checkin-Zweig, gleiche
+      Feldnamen `checkin[name]`/`checkin[latitude]`/`checkin[longitude]`/`content`/`photo` —
+      bewusst nicht vereinfacht, damit im bestehenden Shortcut nur die URL geändert werden muss,
+      nicht jedes Formularfeld)
+- [x] `src/routes/api/micropub/post/+server.ts` neu — nur noch reine Posts, **keine**
+      Album-Fähigkeit mehr (die hat jetzt ihren eigenen Endpoint); `title`+`content` weiterhin
+      Pflicht, `photo-album`-Feld komplett entfernt
+- [x] `src/routes/api/micropub/album/+server.ts` neu — echter eigenständiger Album-Endpoint (gab's
+      vorher nicht, nur "Post mit Album-Flag"): `title` + mind. 2 Fotos Pflicht, `description`/
+      `content` optional, legt intern einen Trägerpost an (schema-bedingt, `photo.postId` ist NOT
+      NULL) über den bestehenden `createAlbumFromPost`-Helper, antwortet aber mit
+      `Location: /albums/{slug}` statt `/posts/{slug}` — Fokus liegt auf dem Album, nicht dem Post
+- [x] Alte Route `src/routes/api/micropub/+server.ts` gelöscht — Requests dorthin sind jetzt 404
+- [x] `.env.example`: Kommentar auf die drei Endpunkte aktualisiert
+- [x] `npm run check` — 0 Fehler
+- [x] Lokal per curl getestet: Checkin unter neuer URL (`/api/micropub/checkin`), alte URL liefert
+      404, neuer Post-Endpoint, neuer Album-Endpoint (Location zeigt korrekt auf `/albums/{slug}`),
+      drei Negativ-Fälle (Album mit 1 Foto, Album ohne Titel, Post ohne Text) → je `400`
+- [x] Im Browser geprüft: `/albums/{slug}` zeigt Titel + Beschreibung + Origin-Post-Link korrekt
+- [x] Aufgeräumt: alle Test-Zeilen (Post, Album, Checkin, Fotos, Tags) + hochgeladene Dateien
+      wieder entfernt
+
+**Wichtig für den Nutzer:** der bestehende Apple Shortcut für Checkins zeigt noch auf die alte URL
+`/api/micropub` — muss auf `/api/micropub/checkin` umgestellt werden, sonst 404. Formularfelder
+im Shortcut bleiben unverändert (nur die URL ändert sich).
+
+## Micropub-Endpoint auf Posts + Alben erweitert — erledigt
+
+Nutzerwunsch: `/api/micropub` (bisher nur Checkins) auch für normale Posts und Post+Album nutzen.
+Frage "brauchen wir getrennte Endpoints pro Bereich?" mit Nein beantwortet — Micropub ist genau
+für einen Endpoint mit interner Verzweigung nach vorhandenen Feldern ausgelegt (ein Shortcut, eine
+URL, ein Token). Vollständiger Plan:
+`/Users/adrian/.claude/plans/https-achis-blog-api-micropub-ist-aktuel-delightful-lynx.md`
+
+- [x] `src/lib/server/albums.ts`: neuer Helper `createAlbumFromPost` (extrahiert aus der bisher
+      nur inline in `routes/posts/new/+page.server.ts` liegenden Album-Erstellungs-/
+      Verknüpfungslogik) — **bewusst nicht** in die 2-3 bestehenden Album-Erstellungs-Stellen
+      (`posts/new`, `routes/albums`, `routes/photos`) zurückintegriert, um funktionierenden Code
+      nicht anzufassen
+- [x] `src/routes/api/micropub/+server.ts`: Dispatch nach `checkin[latitude]`+`checkin[longitude]`
+      (beide vorhanden → bestehender Checkin-Zweig, byte-für-byte unverändert; sonst → neuer
+      Post-Zweig). Neue Felder: `title`+`content` (**beide Pflicht**, Nutzerentscheidung —
+      anders als bei Checkins, wo nur der Standort zählt), `tags` (kommagetrennt, via
+      `parseTagsField`), `photo` (mehrere Dateien erlaubt, `saveNewPostBlocks` unterstützt das
+      schon nativ), `latitude`/`longitude`/`locationName` (optional, mit Best-effort
+      Reverse-Geocoding wie beim Checkin-Zweig), `photo-album=1` (+ optional
+      `photo-album-title`/`photo-album-description`) für Post+Album — Feldname bewusst als
+      einfaches `1`/leer statt `on`-Checkbox gewählt (Nutzerentscheidung, leichter in der
+      Shortcuts-App zu bauen)
+- [x] Validierung: `title`+`content` fehlen → `400`; `photo-album=1` mit weniger als 2 Fotos →
+      `400` (`countNonExcludedNewFiles` vor jedem DB-Write geprüft)
+- [x] `.env.example`: Kommentar zu `MICROPUB_TOKEN`/`MICROPUB_USER_EMAIL` erweitert (nicht mehr
+      nur "owns checkins", jetzt auch Posts/Alben)
+- [x] `npm run check` — 0 Fehler
+- [x] Lokal per curl getestet: Regression Checkin-Flow (unverändert), neuer Post ohne Album, Post
+      + Album mit 2 Fotos (DB geprüft: `album_id` korrekt gesetzt), beide Negativ-Fälle (fehlender
+      Titel/Text → 400, Album mit nur 1 Foto → 400)
+- [x] Im Browser geprüft: `/posts` zeigt neuen Post mit Tags, `/albums/{slug}` zeigt Album mit
+      Titel + Origin-Post-Link, `/checkins` unverändert funktionsfähig
+- [x] Aufgeräumt: Test-Post/-Album/-Checkin samt Fotos, Blocks, Tags und hochgeladenen Dateien
+      wieder aus lokaler DB/`uploads/` entfernt
+
 ## Micropub-Checkin-Endpoint für Apple Shortcut — erledigt
 
 Nutzerwunsch: Apple Shortcut sucht einen Ort in Apple Maps und schickt darüber einen Checkin

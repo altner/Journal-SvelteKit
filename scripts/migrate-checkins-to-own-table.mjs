@@ -1,7 +1,9 @@
 // One-time, idempotent migration: moves posts created via the Micropub checkin endpoint
 // (post.isCheckin = 1) out of post/post_block/photo/post_tag into their own checkin/
-// checkin_block/checkin_photo/checkin_tag tables (same ids/slugs preserved so existing links
-// keep working), then deletes the migrated rows from the post-side tables.
+// checkin_block/checkin_photo tables (same ids/slugs preserved so existing links keep working),
+// then deletes the migrated rows from the post-side tables. Checkins aren't taggable (see
+// tasks/todo.md), so any post_tag rows for a migrated post are discarded, not carried over —
+// there is no checkin_tag table.
 // Usage: node --env-file=.env scripts/migrate-checkins-to-own-table.mjs
 import { createClient } from '@libsql/client';
 
@@ -84,17 +86,6 @@ async function main() {
 			});
 		}
 
-		const { rows: postTags } = await client.execute({
-			sql: 'select id, tag_id, created_at from post_tag where post_id = ?',
-			args: [post.id]
-		});
-		for (const postTag of postTags) {
-			await client.execute({
-				sql: 'insert into checkin_tag (id, checkin_id, tag_id, created_at) values (?, ?, ?, ?)',
-				args: [postTag.id, post.id, postTag.tag_id, postTag.created_at]
-			});
-		}
-
 		// Verify before touching the old rows: counts must match exactly.
 		const { rows: blockCountRows } = await client.execute({
 			sql: 'select count(*) as n from checkin_block where checkin_id = ?',
@@ -104,16 +95,8 @@ async function main() {
 			sql: 'select count(*) as n from checkin_photo where checkin_id = ?',
 			args: [post.id]
 		});
-		const { rows: tagCountRows } = await client.execute({
-			sql: 'select count(*) as n from checkin_tag where checkin_id = ?',
-			args: [post.id]
-		});
 
-		if (
-			Number(blockCountRows[0].n) !== blocks.length ||
-			Number(photoCountRows[0].n) !== photos.length ||
-			Number(tagCountRows[0].n) !== postTags.length
-		) {
+		if (Number(blockCountRows[0].n) !== blocks.length || Number(photoCountRows[0].n) !== photos.length) {
 			throw new Error(`Row count mismatch after migrating checkin ${post.id} — aborting before delete`);
 		}
 

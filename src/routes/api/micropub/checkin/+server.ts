@@ -1,46 +1,17 @@
 import { error } from '@sveltejs/kit';
-import { randomUUID, timingSafeEqual } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import type { RequestHandler } from './$types';
-import { env } from '$env/dynamic/private';
 import { db } from '$lib/server/db';
-import { checkin, user } from '$lib/server/db/schema';
-import { eq } from 'drizzle-orm';
+import { checkin } from '$lib/server/db/schema';
 import { generateCheckinSlug } from '$lib/server/checkins';
 import { saveNewCheckinBlocks } from '$lib/server/checkinBlocks';
 import type { BlockMeta } from '$lib/server/blocks';
 import { reverseGeocode } from '$lib/server/geocode';
-
-// Own-Shortcut-only endpoint: authenticated with a single static bearer token from `.env`
-// (MICROPUB_TOKEN), not IndieAuth — there is no third-party Micropub client involved. See
-// CLAUDE.md / tasks/todo.md for why full IndieAuth was deliberately skipped.
-function isAuthorized(request: Request): boolean {
-	const expected = env.MICROPUB_TOKEN;
-	if (!expected) return false;
-
-	const match = /^Bearer\s+(.+)$/i.exec(request.headers.get('authorization') ?? '');
-	if (!match) return false;
-
-	const provided = Buffer.from(match[1]);
-	const expectedBuf = Buffer.from(expected);
-	// timingSafeEqual throws on length mismatch instead of returning false, and requires
-	// same-length buffers — compare lengths first.
-	if (provided.length !== expectedBuf.length) return false;
-	return timingSafeEqual(provided, expectedBuf);
-}
+import { authorizeMicropubRequest } from '$lib/server/micropubAuth';
 
 export const POST: RequestHandler = async ({ request, url, fetch }) => {
-	if (!isAuthorized(request)) throw error(401, 'Unauthorized');
-
-	const ownerEmail = env.MICROPUB_USER_EMAIL;
-	if (!ownerEmail) throw error(500, 'MICROPUB_USER_EMAIL is not configured');
-
-	const owner = await db.query.user.findFirst({ where: eq(user.email, ownerEmail) });
-	if (!owner) throw error(500, 'MICROPUB_USER_EMAIL does not match any user');
-
 	const data = await request.formData();
-
-	const h = String(data.get('h') ?? 'entry');
-	if (h !== 'entry') throw error(400, 'Only h=entry is supported');
+	const owner = await authorizeMicropubRequest(request, data);
 
 	const locationName = String(data.get('checkin[name]') ?? '').trim();
 	const latitudeRaw = data.get('checkin[latitude]');

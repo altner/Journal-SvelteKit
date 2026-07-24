@@ -92,6 +92,11 @@ Wichtig:
 - `/albums/[id]` – Album-Detail mit allen zugehörigen Fotos
 - `/login` – Anmelden
 
+## API
+
+Für externe Clients (z. B. eigene Apple Shortcuts) gibt es private, token-authentifizierte
+Endpunkte zum Erstellen von Checkins, Posts und Alben — siehe [docs/api.md](docs/api.md).
+
 ## Bekannte Grenzen / mögliche nächste Schritte
 
 - Kein Bearbeiten/Löschen von Posts, Fotos oder Alben (nur Erstellen + Ansehen)
