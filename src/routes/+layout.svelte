@@ -3,8 +3,8 @@
 	import { afterNavigate } from '$app/navigation';
 	import { page } from '$app/state';
 	import { tick } from 'svelte';
-	import Footer from '$lib/components/Footer.svelte';
-	import PostTimeline from '$lib/components/PostTimeline.svelte';
+	import Footer from '$lib/components/shared/Footer.svelte';
+	import PostTimeline from '$lib/components/post/PostTimeline.svelte';
 
 	let { children, data } = $props();
 

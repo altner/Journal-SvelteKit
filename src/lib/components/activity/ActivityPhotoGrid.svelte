@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { pushState, replaceState } from '$app/navigation';
 	import { page } from '$app/state';
-	import PhotoLightbox from './PhotoLightbox.svelte';
+	import PhotoLightbox from '../photo/PhotoLightbox.svelte';
 
 	type Photo = { id: string; filename: string; originalName?: string | null; width?: number | null; height?: number | null };
 	let { photos, activitySlug, priority = false }: { photos: Photo[]; activitySlug: string; priority?: boolean } = $props();

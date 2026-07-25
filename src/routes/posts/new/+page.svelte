@@ -1,5 +1,5 @@
 <script lang="ts">
-	import PostComposer from '$lib/components/PostComposer.svelte';
+	import PostComposer from '$lib/components/post/PostComposer.svelte';
 </script>
 
 <svelte:head>

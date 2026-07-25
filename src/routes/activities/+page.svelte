@@ -2,9 +2,9 @@
 	import { enhance } from '$app/forms';
 	import { beforeNavigate } from '$app/navigation';
 	import type { PageData } from './$types';
-	import ActivityFeedCard from '$lib/components/ActivityFeedCard.svelte';
-	import TagInput from '$lib/components/TagInput.svelte';
-	import Pagination from '$lib/components/Pagination.svelte';
+	import ActivityFeedCard from '$lib/components/activity/ActivityFeedCard.svelte';
+	import TagInput from '$lib/components/shared/TagInput.svelte';
+	import Pagination from '$lib/components/shared/Pagination.svelte';
 	import { tick } from 'svelte';
 
 	let { data }: { data: PageData } = $props();

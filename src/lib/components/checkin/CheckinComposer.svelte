@@ -2,8 +2,8 @@
 	import { enhance } from '$app/forms';
 	import { beforeNavigate } from '$app/navigation';
 	import { tick } from 'svelte';
-	import LocationPicker from './LocationPicker.svelte';
-	import BlockEditor from './BlockEditor.svelte';
+	import LocationPicker from '../shared/LocationPicker.svelte';
+	import BlockEditor from '../shared/BlockEditor.svelte';
 
 	let photoCount = $state(0);
 	let error = $state<string | undefined>();

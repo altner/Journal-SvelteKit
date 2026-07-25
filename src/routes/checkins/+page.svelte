@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import CheckinCard from '$lib/components/CheckinCard.svelte';
-	import Pagination from '$lib/components/Pagination.svelte';
+	import CheckinCard from '$lib/components/checkin/CheckinCard.svelte';
+	import Pagination from '$lib/components/shared/Pagination.svelte';
 	let { data }: { data: PageData } = $props();
 
 	let editingId = $state<string | null>(null);

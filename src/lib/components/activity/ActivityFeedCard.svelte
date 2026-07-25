@@ -3,7 +3,7 @@
 	import ActivityPhotoGrid from './ActivityPhotoGrid.svelte';
 	import DeleteActivityButton from './DeleteActivityButton.svelte';
 	import EditActivityForm from './EditActivityForm.svelte';
-	import OwnerActions from './OwnerActions.svelte';
+	import OwnerActions from '../shared/OwnerActions.svelte';
 	import { sportIcon, formatDistance, formatDuration, formatElevation } from '$lib/activityFormat';
 	import { formatWeatherSummary } from '$lib/weather';
 	import { tick } from 'svelte';
@@ -189,12 +189,12 @@
 	.tag-pill {
 		display: inline-flex;
 		align-items: center;
-		min-height: 44px;
+		min-height: 10px;
 		background: var(--fb-hover);
 		color: var(--fb-blue);
 		font-size: 12px;
 		font-weight: 600;
-		padding: 6px 12px;
+		padding: 6px 6px;
 		border-radius: 22px;
 		text-decoration: none;
 	}

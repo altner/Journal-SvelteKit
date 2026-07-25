@@ -1,5 +1,5 @@
 <script lang="ts">
-	import CheckinComposer from '$lib/components/CheckinComposer.svelte';
+	import CheckinComposer from '$lib/components/checkin/CheckinComposer.svelte';
 </script>
 
 <svelte:head>

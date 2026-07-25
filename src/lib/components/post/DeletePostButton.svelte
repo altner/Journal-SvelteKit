@@ -1,5 +1,5 @@
 <script lang="ts">
-	import ConfirmDeleteButton from './ConfirmDeleteButton.svelte';
+	import ConfirmDeleteButton from '../shared/ConfirmDeleteButton.svelte';
 
 	let { postSlug, afterDelete }: { postSlug: string; afterDelete?: () => void } = $props();
 </script>

@@ -2,9 +2,9 @@
 	import { enhance } from '$app/forms';
 	import { beforeNavigate } from '$app/navigation';
 	import type { PageData } from './$types';
-	import PhotoTabs from '$lib/components/PhotoTabs.svelte';
-	import JustifiedGallery from '$lib/components/JustifiedGallery.svelte';
-	import Pagination from '$lib/components/Pagination.svelte';
+	import PhotoTabs from '$lib/components/photo/PhotoTabs.svelte';
+	import JustifiedGallery from '$lib/components/photo/JustifiedGallery.svelte';
+	import Pagination from '$lib/components/shared/Pagination.svelte';
 	import { tick } from 'svelte';
 	let { data }: { data: PageData } = $props();
 

@@ -1,8 +1,8 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import PostCard from '$lib/components/PostCard.svelte';
-	import ActivityFeedCard from '$lib/components/ActivityFeedCard.svelte';
-	import Pagination from '$lib/components/Pagination.svelte';
+	import PostCard from '$lib/components/post/PostCard.svelte';
+	import ActivityFeedCard from '$lib/components/activity/ActivityFeedCard.svelte';
+	import Pagination from '$lib/components/shared/Pagination.svelte';
 	let { data }: { data: PageData } = $props();
 
 	let editingId = $state<string | null>(null);

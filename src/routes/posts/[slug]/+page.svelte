@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import type { PageData } from './$types';
-	import PostCard from '$lib/components/PostCard.svelte';
+	import PostCard from '$lib/components/post/PostCard.svelte';
 	let { data }: { data: PageData } = $props();
 
 	let editing = $state(false);

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { PageServerData } from './$types';
-	import PhotoLightbox from '$lib/components/PhotoLightbox.svelte';
+	import PhotoLightbox from '$lib/components/photo/PhotoLightbox.svelte';
 
 	let { data }: { data: PageServerData } = $props();
 

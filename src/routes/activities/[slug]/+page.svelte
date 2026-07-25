@@ -1,13 +1,13 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import type { PageData } from './$types';
-	import TrackMap from '$lib/components/TrackMap.svelte';
-	import ActivityPhotoGrid from '$lib/components/ActivityPhotoGrid.svelte';
-	import DeleteActivityButton from '$lib/components/DeleteActivityButton.svelte';
-	import EditActivityForm from '$lib/components/EditActivityForm.svelte';
+	import TrackMap from '$lib/components/activity/TrackMap.svelte';
+	import ActivityPhotoGrid from '$lib/components/activity/ActivityPhotoGrid.svelte';
+	import DeleteActivityButton from '$lib/components/activity/DeleteActivityButton.svelte';
+	import EditActivityForm from '$lib/components/activity/EditActivityForm.svelte';
 	import { sportIcon, formatDistance, formatDuration, formatElevation } from '$lib/activityFormat';
 	import { formatWeatherSummary } from '$lib/weather';
-	import OwnerActions from '$lib/components/OwnerActions.svelte';
+	import OwnerActions from '$lib/components/shared/OwnerActions.svelte';
 	import { tick } from 'svelte';
 
 	let { data }: { data: PageData } = $props();

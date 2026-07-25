@@ -7,15 +7,36 @@ import { generateCheckinSlug } from '$lib/server/checkins';
 import { saveNewCheckinBlocks } from '$lib/server/checkinBlocks';
 import type { BlockMeta } from '$lib/server/blocks';
 import { reverseGeocode } from '$lib/server/geocode';
-import { authorizeMicropubRequest } from '$lib/server/micropubAuth';
+import { authorizeIndieAuthCheckinRequest } from '$lib/server/indieAuthCheckinAuth';
+
+// Standard Micropub JSON syntax (https://micropub.spec.indieweb.org/#json-syntax), the shape
+// osm-checkin sends: an h-entry whose `checkin` property is itself an h-card with name/lat/lon.
+interface MicropubJsonEntry {
+	type?: string[];
+	properties?: {
+		checkin?: [{ properties?: { name?: string[]; latitude?: string[]; longitude?: string[] } }];
+		content?: string[];
+	};
+}
 
 export const POST: RequestHandler = async ({ request, url, fetch }) => {
-	const data = await request.formData();
-	const owner = await authorizeMicropubRequest(request, data);
+	const owner = await authorizeIndieAuthCheckinRequest(request, fetch);
 
-	const locationName = String(data.get('checkin[name]') ?? '').trim();
-	const latitudeRaw = data.get('checkin[latitude]');
-	const longitudeRaw = data.get('checkin[longitude]');
+	let body: MicropubJsonEntry;
+	try {
+		body = await request.json();
+	} catch {
+		throw error(400, 'Expected a JSON body');
+	}
+
+	if (!body.type?.includes('h-entry')) {
+		throw error(400, 'Expected type: ["h-entry"]');
+	}
+
+	const checkinCard = body.properties?.checkin?.[0];
+	const locationName = String(checkinCard?.properties?.name?.[0] ?? '').trim();
+	const latitudeRaw = checkinCard?.properties?.latitude?.[0];
+	const longitudeRaw = checkinCard?.properties?.longitude?.[0];
 	const latitude = typeof latitudeRaw === 'string' ? Number(latitudeRaw) : NaN;
 	const longitude = typeof longitudeRaw === 'string' ? Number(longitudeRaw) : NaN;
 	if (
@@ -26,10 +47,10 @@ export const POST: RequestHandler = async ({ request, url, fetch }) => {
 		!Number.isFinite(latitude) ||
 		!Number.isFinite(longitude)
 	) {
-		throw error(400, 'checkin[latitude] and checkin[longitude] are required');
+		throw error(400, 'properties.checkin[0].properties.latitude/longitude are required');
 	}
 
-	const content = String(data.get('content') ?? '').trim();
+	const content = String(body.properties?.content?.[0] ?? '').trim();
 
 	// Best-effort, like the activity weather backfill — a Nominatim hiccup shouldn't fail the
 	// whole checkin, it just leaves the address fields unset (same as a post created before this
@@ -68,12 +89,11 @@ export const POST: RequestHandler = async ({ request, url, fetch }) => {
 		postcode
 	});
 
-	// A checkin is just at most one text block and one photo block — same block-saving logic the
-	// normal composer uses (routes/posts/new), just against checkin_block/checkin_photo.
+	// v1 over IndieAuth has no photo support (osm-checkin sends JSON, not a file upload — see the
+	// indie-auth integration plan) — just the text block, no photos block at all.
 	const blocksMeta: BlockMeta[] = [];
 	if (content) blocksMeta.push({ id: randomUUID(), type: 'text', text: content });
-	blocksMeta.push({ id: randomUUID(), type: 'photos', fileField: 'photo', excludeFromStream: false });
-	await saveNewCheckinBlocks(id, blocksMeta, data);
+	if (blocksMeta.length > 0) await saveNewCheckinBlocks(id, blocksMeta, new FormData());
 
 	return new Response(null, { status: 201, headers: { Location: `${url.origin}/checkins/${slug}` } });
 };

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import type { PageData } from './$types';
-	import PhotoLightbox from '$lib/components/PhotoLightbox.svelte';
+	import PhotoLightbox from '$lib/components/photo/PhotoLightbox.svelte';
 
 	let { data }: { data: PageData } = $props();
 

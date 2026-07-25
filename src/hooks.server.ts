@@ -7,7 +7,32 @@ import { isProtectedPath, safeInternalRedirect } from '$lib/server/redirect';
 // SvelteKit generiert dafür einen Nonce für seinen eigenen Inline-Bootstrap-<script> und hängt ihn
 // automatisch an script-src an, was von Hand im hook nicht ginge.
 
+// Only /api/micropub/checkin is meant to be called cross-origin from a browser (osm-checkin, or
+// any future IndieAuth-authenticated Micropub client) — it carries no cookies, only a Bearer
+// token, so reflecting the request's Origin back is safe. post/album stay same-origin-only
+// (Apple Shortcut, no browser CORS involved).
+const CORS_PATHS = ['/api/micropub/checkin'];
+
+function isCorsPath(pathname: string) {
+	return CORS_PATHS.includes(pathname);
+}
+
+function applyCorsHeaders(headers: Headers, origin: string | null) {
+	if (!origin) return;
+	headers.set('Access-Control-Allow-Origin', origin);
+	headers.set('Vary', 'Origin');
+	headers.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+	headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+	headers.set('Access-Control-Expose-Headers', 'Location');
+}
+
 export const handle: Handle = async ({ event, resolve }) => {
+	if (isCorsPath(event.url.pathname) && event.request.method === 'OPTIONS') {
+		const headers = new Headers();
+		applyCorsHeaders(headers, event.request.headers.get('origin'));
+		return new Response(null, { status: 204, headers });
+	}
+
 	const user = await getSessionUser(event.cookies);
 	event.locals.user = user;
 
@@ -27,6 +52,10 @@ export const handle: Handle = async ({ event, resolve }) => {
 	response.headers.set('X-Content-Type-Options', 'nosniff');
 	response.headers.set('X-Frame-Options', 'DENY');
 	response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+
+	if (isCorsPath(event.url.pathname)) {
+		applyCorsHeaders(response.headers, event.request.headers.get('origin'));
+	}
 
 	return response;
 };

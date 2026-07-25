@@ -44,8 +44,8 @@
 		color: var(--fb-blue);
 		font-size: 14px;
 		font-weight: 600;
-		min-height: 44px;
-		padding: 8px 14px;
+		min-height: 10px;
+		padding: 8px 8px;
 		border-radius: 22px;
 		text-decoration: none;
 		display: inline-flex;

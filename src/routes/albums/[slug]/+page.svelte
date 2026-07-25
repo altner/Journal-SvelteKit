@@ -3,10 +3,10 @@
 	import { enhance } from '$app/forms';
 	import { page } from '$app/state';
 	import type { PageData } from './$types';
-	import PhotoLightbox from '$lib/components/PhotoLightbox.svelte';
-	import DeleteAlbumButton from '$lib/components/DeleteAlbumButton.svelte';
-	import JustifiedGallery from '$lib/components/JustifiedGallery.svelte';
-	import OwnerActions from '$lib/components/OwnerActions.svelte';
+	import PhotoLightbox from '$lib/components/photo/PhotoLightbox.svelte';
+	import DeleteAlbumButton from '$lib/components/album/DeleteAlbumButton.svelte';
+	import JustifiedGallery from '$lib/components/photo/JustifiedGallery.svelte';
+	import OwnerActions from '$lib/components/shared/OwnerActions.svelte';
 	import { tick } from 'svelte';
 
 	let { data }: { data: PageData } = $props();

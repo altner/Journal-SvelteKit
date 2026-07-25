@@ -2,9 +2,9 @@
 	import { enhance } from '$app/forms';
 	import { beforeNavigate } from '$app/navigation';
 	import { onMount, tick, untrack } from 'svelte';
-	import TagInput from './TagInput.svelte';
-	import LocationPicker from './LocationPicker.svelte';
-	import BlockEditor from './BlockEditor.svelte';
+	import TagInput from '../shared/TagInput.svelte';
+	import LocationPicker from '../shared/LocationPicker.svelte';
+	import BlockEditor from '../shared/BlockEditor.svelte';
 
 	let { collapsible = false }: { collapsible?: boolean } = $props();
 

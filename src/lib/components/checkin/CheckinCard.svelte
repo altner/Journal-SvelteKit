@@ -2,8 +2,8 @@
 	import CheckinPhotoGrid from './CheckinPhotoGrid.svelte';
 	import DeleteCheckinButton from './DeleteCheckinButton.svelte';
 	import EditCheckinForm from './EditCheckinForm.svelte';
-	import OwnerActions from './OwnerActions.svelte';
-	import TrackMap from './TrackMap.svelte';
+	import OwnerActions from '../shared/OwnerActions.svelte';
+	import TrackMap from '../activity/TrackMap.svelte';
 	import { renderMarkdownToSafeHtml } from '$lib/markdown';
 	import { tick } from 'svelte';
 

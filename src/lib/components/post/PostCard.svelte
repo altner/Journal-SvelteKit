@@ -1,8 +1,8 @@
 <script lang="ts">
-	import PhotoGrid from './PhotoGrid.svelte';
+	import PhotoGrid from '../photo/PhotoGrid.svelte';
 	import DeletePostButton from './DeletePostButton.svelte';
 	import EditPostForm from './EditPostForm.svelte';
-	import OwnerActions from './OwnerActions.svelte';
+	import OwnerActions from '../shared/OwnerActions.svelte';
 	import { renderMarkdownToSafeHtml } from '$lib/markdown';
 	import { tick } from 'svelte';
 
@@ -258,7 +258,7 @@
 		color: var(--fb-blue);
 	}
 	.post-location {
-		margin-top: 4px;
+		margin: 4px 0 4px 0;
 	}
 	.location-pill {
 		color: var(--fb-gray);

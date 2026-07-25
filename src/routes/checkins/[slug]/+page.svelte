@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import type { PageData } from './$types';
-	import CheckinCard from '$lib/components/CheckinCard.svelte';
+	import CheckinCard from '$lib/components/checkin/CheckinCard.svelte';
 	let { data }: { data: PageData } = $props();
 
 	let editing = $state(false);

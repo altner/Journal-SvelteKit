@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { pushState, replaceState } from '$app/navigation';
 	import { page } from '$app/state';
-	import PhotoLightbox from './PhotoLightbox.svelte';
+	import PhotoLightbox from '../photo/PhotoLightbox.svelte';
 
 	type Photo = {
 		id: string;

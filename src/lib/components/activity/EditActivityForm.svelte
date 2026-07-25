@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { beforeNavigate } from '$app/navigation';
-	import TagInput from './TagInput.svelte';
+	import TagInput from '../shared/TagInput.svelte';
 	import { onMount, tick } from 'svelte';
 
 	let {

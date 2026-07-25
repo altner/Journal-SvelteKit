@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { beforeNavigate } from '$app/navigation';
-	import TagInput from './TagInput.svelte';
-	import LocationPicker from './LocationPicker.svelte';
-	import BlockEditor from './BlockEditor.svelte';
+	import TagInput from '../shared/TagInput.svelte';
+	import LocationPicker from '../shared/LocationPicker.svelte';
+	import BlockEditor from '../shared/BlockEditor.svelte';
 	import { onMount, tick } from 'svelte';
 
 	let {
