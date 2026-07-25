@@ -58,6 +58,16 @@ curl -i -X POST https://achis.blog/api/micropub/checkin \
 
 Legt einen normalen Post an. Keine Album-Fähigkeit — dafür gibt's den eigenen Endpoint unten.
 
+**Auth, abweichend vom Rest dieses Abschnitts:** Dieser Endpoint akzeptiert zusätzlich zum
+statischen `MICROPUB_TOKEN` auch einen echten IndieAuth-Bearer-Token (Introspection gegen
+`INDIEAUTH_INTROSPECT_URL`, Scope `create`, `me === INDIEAUTH_ME` — exakt wie beim
+`checkin`-Endpoint). Der statische Token wird zuerst geprüft (kein Netzwerk-Roundtrip); nur wenn
+der nicht passt, wird IndieAuth-Introspection versucht. Damit können sowohl die eigenen Apple
+Shortcuts (statischer Token) als auch browserbasierte IndieAuth-Clients wie der Quill-Editor
+posten. Der Endpoint ist außerdem CORS-fähig (siehe `CORS_PATHS` in `hooks.server.ts`) — ein
+Fetch von einer fremden Origin aus dem Browser funktioniert, solange ein gültiger Bearer-Token
+mitgeschickt wird.
+
 | Feld | Pflicht | Beschreibung |
 | --- | --- | --- |
 | `title` | ✅ | Post-Titel |
@@ -78,6 +88,22 @@ Bei gesetzten, validen Koordinaten: best-effort Reverse-Geocoding für `location
 curl -i -X POST https://achis.blog/api/micropub/post \
   -H "Authorization: Bearer $MICROPUB_TOKEN" -H "Origin: https://achis.blog" \
   -F "h=entry" -F "title=Mein Titel" -F "content=Mein Text" -F "tags=urlaub,dresden"
+```
+
+Aus dem Browser mit einem echten IndieAuth-Token (z. B. der Quill-Editor, andere Origin):
+
+```js
+const form = new FormData();
+form.append('h', 'entry');
+form.append('title', 'Mein Titel');
+form.append('content', 'Mein Text');
+form.append('tags', 'urlaub,dresden');
+// form.append('photo', fileFromInput); // wiederholbar für mehrere Fotos
+await fetch('https://achis.blog/api/micropub/post', {
+  method: 'POST',
+  headers: { Authorization: `Bearer ${indieAuthAccessToken}` },
+  body: form
+});
 ```
 
 ### `POST /api/micropub/album`
@@ -160,8 +186,9 @@ bereinigt (Schutz vor Path Traversal). `Cache-Control: public, max-age=31536000,
 
 ## Formular-Actions
 
-Alle übrigen Schreiboperationen (Post/Checkin/Aktivität/Album erstellen, bearbeiten, löschen) laufen
-über SvelteKit Form Actions auf den jeweiligen Seiten (`/posts/new`, `/posts/[slug]`,
-`/checkins/new`, `/checkins/[slug]`, `/activities`, `/activities/[slug]`, `/albums`,
-`/albums/[slug]`, `/photos`) — das sind keine JSON/REST-Endpunkte, sondern normale
-HTML-Formular-Submits mit Session-Cookie-Auth, nicht Teil dieser API-Referenz.
+Post/Checkin/Album-*Erstellung* läuft ausschließlich über die Micropub-Endpunkte oben — es gibt
+kein Web-Formular dafür mehr. Bearbeiten und Löschen bereits existierender Posts/Checkins/Aktivitäten/
+Alben läuft weiterhin über SvelteKit Form Actions auf den jeweiligen Detailseiten (`/posts/[slug]`,
+`/checkins/[slug]`, `/activities`, `/activities/[slug]`, `/albums/[slug]`, `/photos`) — das sind
+keine JSON/REST-Endpunkte, sondern normale HTML-Formular-Submits mit Session-Cookie-Auth, nicht Teil
+dieser API-Referenz.

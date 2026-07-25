@@ -84,26 +84,36 @@ since the DDL ends up equivalent.
 
 **Auth flow:** `src/hooks.server.ts` runs on every request, loads the session user via
 `getSessionUser` (`src/lib/server/auth.ts`) into `event.locals.user`. Reading is public by
-default — feed, photos, albums, post/photo permalinks and `/uploads/*` all work without a login;
-only paths matching `PROTECTED_PREFIXES` (currently just `/posts/new`) redirect to `/login` when
-logged out. New write *pages* (a route whose whole purpose is creating something, like
-`/posts/new`) should be added to that list. New write *actions on an otherwise-public page*
-(`addPhotos` on `/albums/[id]`, `delete` on `/posts/[id]`) must NOT be added — the prefix match is
-a plain `startsWith` on the pathname, so protecting `/albums` or `/posts/[id]` would also block
-public GET access to those pages. Those actions instead do their own `if (!locals.user) return
+default — feed, photos, albums, post/photo permalinks and `/uploads/*` all work without a login.
+`PROTECTED_PREFIXES` (`src/lib/server/redirect.ts`) is currently **empty**: post/checkin/album
+*creation* moved to Micropub-only (see below) and there is no other write-only page left that
+needs a prefix-based `/login` redirect. If a new write-only page is ever added again (a route
+whose whole purpose is creating something, the way `/posts/new` used to be), add its prefix here
+— but remember `PROTECTED_PREFIXES` alone doesn't help a route with no `load` function, since
+SvelteKit skips the server round-trip on client-side navigation to such a route and the hook never
+runs; give it a trivial `load` that itself checks `locals.user` and redirects, forcing the
+round-trip. Write *actions on an otherwise-public page* (`addPhotos` on `/albums/[slug]`, `delete`
+on `/posts/[slug]`) must NOT go through `PROTECTED_PREFIXES` — the prefix match is a plain
+`startsWith` on the pathname, so protecting `/albums` or `/posts/[slug]` would also block public
+GET access to those pages. Those actions instead do their own `if (!locals.user) return
 fail(401, ...)` check inside the action handler — the default for new routes/actions is public,
-opt into protection deliberately and at the right granularity. **`PROTECTED_PREFIXES` alone is not
-enough for a route that has no `load` function** (like `/posts/new`, which originally only
-exported `actions`) — SvelteKit skips the server round-trip entirely for client-side navigation to
-such a route (e.g. clicking an `<a href="/posts/new">` from an already-hydrated page), so the hook
-never runs and a logged-out visitor sees the page/form rendered anyway (confirmed live: form was
-reachable without a session cookie, only the actual submit got redirected to `/login` via the
-action's own check). Fixed by adding a trivial `load` to `posts/new/+page.server.ts` that itself
-checks `locals.user` and redirects — this forces the round-trip the hook needs to run on. Any new
-protected write-page route needs the same: don't rely on the hook alone unless the route already
-has a `load` for other reasons. Passwords are hashed with `node:crypto` scrypt
-(`salt:hash` hex format), not bcrypt/argon2, to avoid native dependencies. There's no
-password-reset flow; recovery means re-running `create-user`.
+opt into protection deliberately and at the right granularity. Passwords are hashed with
+`node:crypto` scrypt (`salt:hash` hex format), not bcrypt/argon2, to avoid native dependencies.
+There's no password-reset flow; recovery means re-running `create-user`.
+
+**Post/checkin/album creation is Micropub-only — there is no web form.** `PostComposer.svelte`,
+`CheckinComposer.svelte`, `/posts/new`, and `/checkins/new` were removed; the only way to create a
+post, checkin, or album is `POST /api/micropub/{post,checkin,album}` (see `docs/api.md`), called by
+an IndieAuth/Micropub client (e.g. the separate Quill editor project, an Apple Shortcut, or
+osm-checkin). Editing and deleting existing posts/checkins/albums still happens through the web UI
+(`EditPostForm.svelte`, `EditCheckinForm.svelte`, the delete actions on `/posts/[slug]` etc.) —
+only the *creation* path moved. Each Micropub endpoint owns exactly one entity type (no in-endpoint
+dispatch flag); `routes/api/micropub/post` also does not create albums, that's
+`routes/api/micropub/album`'s own job. One real feature gap versus the old web composer: the
+Micropub endpoints only support a single fixed text block + single photos block per entity, while
+the web UI's `BlockEditor` (still used by the edit forms) supports an arbitrarily ordered mix of
+multiple text/photo blocks — a Micropub-created post/checkin can't produce that richer block
+structure, only editing one afterward can.
 
 **Photo storage:** Photos are written to disk (`UPLOAD_DIR`, default `./uploads`) with a random
 UUID filename (original extension preserved if it's an allowed image type) — see
@@ -195,21 +205,6 @@ its own component rather than sharing one abstraction — the three photo lists 
 differ enough that a generic wrapper would need as much branching as just repeating the ~20 lines.
 Only the presentational `PhotoLightbox` is actually shared. Adding a fourth context (e.g. a
 per-author stream) means repeating this pattern again, not extending an existing one.
-
-**Post composer is cross-route (`src/lib/components/PostComposer.svelte`):** the create-post
-`<form>` is rendered inline above the feed on `/` (only when `data.user` is set — `/` itself has
-no `load`-level auth check since it's public, so this is purely a display gate) as well as
-standalone on `/posts/new` (kept as a progressive-enhancement fallback / direct-link target). Both
-instances post to the same `action="/posts/new"`, which is where the actual `actions.default` and
-its own auth check live (`routes/posts/new/+page.server.ts`). **Do not rely on `page.form`
-(`$app/state`) to read the result of a cross-route form action** — in practice it did not update
-reactively here when the form's `action` pointed at a different route than the one it was
-rendered on (`/` submitting to `/posts/new`); use an explicit `use:enhance={() => async ({result,
-update, formElement}) => {...}}` callback instead and read `result.data` directly into local
-component state, as `PostComposer` does. Because the server action always responds with a
-`redirect` on success (never a `success` result), remember to reset the form/local state
-(`formElement.reset()`) yourself in that branch — SvelteKit's default post-submit form reset only
-fires for `success` results, not redirects.
 
 ## Workflow-Konventionen
 

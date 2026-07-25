@@ -1,5 +1,78 @@
 # Todo
 
+## Post/Checkin/Album-Erstellung konsequent auf Micropub umgestellt, Web-Formulare entfernt — erledigt
+
+Nutzerwunsch: Erstellung soll ausschließlich über Micropub laufen, nicht mehr über Web-Formulare.
+**Ändert die Prämisse der vorherigen Eintrag darunter** — Alben werden jetzt entgegen der
+ursprünglichen Annahme dort ebenfalls über Micropub angelegt (`/api/micropub/album` existierte
+schon), nicht mehr exklusiv über die Weboberfläche. Activities bleiben bewusst außen vor (kommen
+über GPX-Import aus Komoot, eigenes Thema für später).
+
+- [x] `src/routes/posts/new/` (page + server action) gelöscht
+- [x] `src/routes/checkins/new/` (page + server action) gelöscht
+- [x] `src/lib/components/post/PostComposer.svelte` gelöscht
+- [x] `src/lib/components/checkin/CheckinComposer.svelte` gelöscht
+- [x] `src/routes/+page.svelte`: PostComposer-Einbindung entfernt, Empty-State-Text angepasst
+- [x] `src/routes/checkins/+page.svelte`: "+ Checkin hinzufügen"-Link + zugehöriges CSS entfernt
+- [x] `src/lib/server/redirect.ts`: `PROTECTED_PREFIXES` jetzt leer (kein Web-only-Write-Page mehr
+      übrig) — Mechanismus bleibt für zukünftige Fälle bestehen
+- [x] `src/lib/components/shared/LocationPicker.svelte`: toten `startExpanded`/`requirePoiName`-Props
+      entfernt (einziger Aufrufer war `CheckinComposer`)
+- [x] `src/lib/server/datetime.ts` (`resolveCreatedAt`) gelöscht — keine Aufrufer mehr, beide
+      Composer waren die einzigen
+- [x] `src/lib/server/albums.ts`: veralteten Kommentar auf `routes/posts/new` korrigiert
+- [x] `CLAUDE.md`: Auth-Flow-Abschnitt (`PROTECTED_PREFIXES` jetzt leer) + neuer Abschnitt zur
+      Micropub-only-Erstellung inkl. Block-Feature-Gap ergänzt; veralteten "Post composer is
+      cross-route"-Abschnitt entfernt
+- [x] `docs/api.md`: Formular-Actions-Abschnitt korrigiert (Erstellung nur noch Micropub, Bearbeiten/
+      Löschen weiterhin Form Actions)
+- [x] `npm run check` — 0 Fehler
+
+**Bekannte Lücke, bewusst in Kauf genommen:** Die Micropub-Endpunkte (`post`/`checkin`/`album`)
+unterstützen nur genau einen Text-Block + einen Photos-Block pro Entität (feste Struktur), während
+der alte Web-Composer über `BlockEditor` beliebig viele, frei sortierbare Text-/Foto-Blöcke erlaubte.
+Diese Block-Vielfalt lässt sich über Micropub aktuell nicht erzeugen — nur nachträgliches Bearbeiten
+über die (weiterhin bestehenden) Edit-Formulare kann das.
+
+## `/api/micropub/post`: IndieAuth-Bearer + CORS für den Quill-Editor — erledigt
+
+Nutzerwunsch: ein eigener, browserbasierter Zen-Editor ("Quill", separates Projekt unter
+`/Users/adrian/Projects/quill/`) soll echte Posts (Titel, Text, Tags, optional Fotos) direkt gegen
+achis.blog erstellen können, mit echtem IndieAuth-Login statt Copy-Paste des statischen
+`MICROPUB_TOKEN`. **Hinweis: der folgende Satz zu Alben ist durch den Eintrag oben überholt** —
+Alben bleiben nicht mehr exklusiv Sache der Weboberfläche, `saveAsAlbum` (und `PostComposer`
+insgesamt) existieren nicht mehr. Ursprünglicher Text zur Historie: Alben blieben bewusst exklusiv
+Sache der Blog-eigenen Weboberfläche (`PostComposer.svelte`s `saveAsAlbum`-Checkbox) — Quill legt
+nie Alben an.
+
+- [x] `src/lib/server/indieAuthCheckinAuth.ts`: `verifyIndieAuthCreateScope(token, fetchFn)`
+      exportiert — Introspection + `me`/`create`-Scope-Check ohne Owner-Auflösung, wiederverwendbar
+      von `micropubAuth.ts` ohne die Checkin-spezifische Owner-Lookup-Logik zu duplizieren
+- [x] `src/lib/server/micropubAuth.ts`: neue `authorizeMicropubPostRequest(request, data, fetchFn)`
+      — probiert zuerst den statischen Token (kein Netzwerk-Roundtrip), fällt bei Fehlschlag auf
+      IndieAuth-Introspection zurück. `authorizeMicropubRequest` (statischer Token, für
+      `checkin`/`album`) bleibt unverändert bestehen
+- [x] `src/routes/api/micropub/post/+server.ts`: nutzt jetzt `authorizeMicropubPostRequest` statt
+      `authorizeMicropubRequest`
+- [x] `src/hooks.server.ts`: `/api/micropub/post` zu `CORS_PATHS` hinzugefügt (gleiches Muster wie
+      `checkin` — Bearer-Token statt Cookies, daher cross-origin unbedenklich); Kommentar
+      korrigiert (`post` ist jetzt auch cross-origin gedacht, nur `album` bleibt
+      same-origin/Shortcuts-only)
+- [x] `docs/api.md`: Auth-Abschnitt von `POST /api/micropub/post` um IndieAuth-Bearer-Pfad +
+      Browser-Fetch-Beispiel ergänzt
+- [x] `npm run check` — 0 Fehler
+- [x] Per Node-Testskript (curl's `-F`-Flag war in dieser Sandbox blockiert) verifiziert:
+      statischer Token funktioniert weiterhin (Regression), CORS reflektiert eine fremde Origin
+      korrekt (`Access-Control-Allow-Origin`), ein kompletter Post inkl. Foto-Upload über den neuen
+      Pfad landet korrekt in `post`/`post_block`/`photo` und wird als WebP unter `uploads/`
+      gespeichert. Ungültiger Bearer-Token ohne erreichbaren `INDIEAUTH_INTROSPECT_URL` liefert
+      `500` statt `401` — das ist vorbestehendes Verhalten von `introspectToken()` (identisch bei
+      `checkin`), keine Regression dieser Änderung, daher nicht mit behoben
+- [x] Testdaten (Test-Posts + hochgeladenes Testfoto) nach der Verifikation wieder gelöscht
+- [ ] Quill-seitig: `index.html` auf `multipart/form-data` + Markdown-Konvertierung (Turndown)
+      umgebaut, Draft/Publish-Status entfernt, Foto-Picker statt Inline-Bild-Toolbar-Button — siehe
+      Commit-Historie im `quill`-Projekt, nicht Teil dieses Repos
+
 ## Checkin: OSM-Quelllink (locationUrl) durchreichen — erledigt, noch nicht deployed
 
 osm-checkin schickt in der Checkin-h-card bereits eine `url`-Property (Link zum OSM-Node/Way, aus

@@ -19,11 +19,8 @@ export async function generateAlbumSlug(title: string, id: string): Promise<stri
 }
 
 /** Creates an album from an already-existing post's photos, linking both the post and the given
- *  photos to it — the same insert/link sequence `routes/posts/new/+page.server.ts`'s action does
- *  inline for the web composer's "save as album" checkbox, extracted here so the Micropub endpoint
- *  can reuse it too. Deliberately not retrofitted into the other 2-3 existing album-creation call
- *  sites (routes/posts/new, routes/albums, routes/photos) — those are working, tested code with
- *  their own slightly different trigger conditions; no requirement to touch them right now. */
+ *  photos to it. Used by `routes/api/micropub/album/+server.ts`, the only album-creation path now
+ *  that album creation moved from the (removed) web composer to Micropub-only. */
 export async function createAlbumFromPost(
 	postId: string,
 	info: { title: string; description: string | null },

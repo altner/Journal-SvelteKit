@@ -14,10 +14,6 @@
 <div class="page feed">
 	<h1>Checkins</h1>
 
-	{#if data.user}
-		<a class="add-checkin" href="/checkins/new">+ Checkin hinzufügen</a>
-	{/if}
-
 	{#if data.posts.length === 0}
 		<p class="empty">Noch keine Checkins.</p>
 	{/if}
@@ -40,22 +36,6 @@
 	h1 {
 		font-size: 20px;
 		margin: 0 0 16px 0;
-	}
-	.add-checkin {
-		display: inline-flex;
-		align-items: center;
-		align-self: flex-start;
-		min-height: 44px;
-		padding: 8px 14px;
-		border: 1px solid var(--fb-border);
-		border-radius: 6px;
-		font-size: 14px;
-		font-weight: 600;
-		color: var(--fb-blue);
-		text-decoration: none;
-	}
-	.add-checkin:hover {
-		background: var(--fb-hover);
 	}
 	.feed {
 		display: flex;

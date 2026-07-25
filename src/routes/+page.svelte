@@ -1,6 +1,5 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import PostComposer from '$lib/components/post/PostComposer.svelte';
 	import PostCard from '$lib/components/post/PostCard.svelte';
 	import ActivityFeedCard from '$lib/components/activity/ActivityFeedCard.svelte';
 	import CheckinCard from '$lib/components/checkin/CheckinCard.svelte';
@@ -17,14 +16,10 @@
 <div class="page feed">
 	<h1 class="sr-only">Feed</h1>
 
-	{#if data.user}
-		<PostComposer collapsible />
-	{/if}
-
 	{#if data.items.length === 0}
 		<p class="empty">
 			{#if data.user}
-				Noch nichts hier. Nutze den Composer oben oder
+				Noch nichts hier. Neue Beiträge, Checkins und Alben entstehen über Micropub, oder
 				<a href="/activities">lade eine Aktivität hoch</a>.
 			{:else}
 				Noch keine Beiträge oder Aktivitäten.

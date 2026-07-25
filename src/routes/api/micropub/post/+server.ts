@@ -7,7 +7,7 @@ import { generatePostSlug } from '$lib/server/posts';
 import { setPostTags, parseTagsField } from '$lib/server/tags';
 import { saveNewPostBlocks, type BlockMeta } from '$lib/server/blocks';
 import { reverseGeocode } from '$lib/server/geocode';
-import { authorizeMicropubRequest } from '$lib/server/micropubAuth';
+import { authorizeMicropubPostRequest } from '$lib/server/micropubAuth';
 
 // Plain posts only — no album creation here, that's routes/api/micropub/album's own job. Keeping
 // each endpoint's contract to exactly one entity type instead of an in-endpoint flag was a
@@ -15,7 +15,7 @@ import { authorizeMicropubRequest } from '$lib/server/micropubAuth';
 // practice (see tasks/todo.md).
 export const POST: RequestHandler = async ({ request, url, fetch }) => {
 	const data = await request.formData();
-	const owner = await authorizeMicropubRequest(request, data);
+	const owner = await authorizeMicropubPostRequest(request, data, fetch);
 
 	const title = String(data.get('title') ?? '').trim();
 	const content = String(data.get('content') ?? '').trim();

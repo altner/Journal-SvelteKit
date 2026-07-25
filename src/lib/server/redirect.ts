@@ -1,6 +1,10 @@
 const INTERNAL_ORIGIN = 'https://achis.invalid';
 
-export const PROTECTED_PREFIXES = ['/posts/new', '/checkins/new'] as const;
+// Post/checkin/album creation moved to Micropub-only (no web form) — there is currently no
+// write-only page left that needs this prefix-based auth gate. Individual write actions on
+// otherwise-public pages (e.g. `delete` on /posts/[slug]) keep doing their own
+// `if (!locals.user) return fail(401, ...)` check instead, per the convention in CLAUDE.md.
+export const PROTECTED_PREFIXES = [] as const;
 
 export function isProtectedPath(pathname: string) {
 	return PROTECTED_PREFIXES.some(

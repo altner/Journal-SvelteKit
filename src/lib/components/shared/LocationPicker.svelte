@@ -5,8 +5,6 @@
 
 	let {
 		initialLocation = null,
-		startExpanded = false,
-		requirePoiName = false,
 		onChange
 	}: {
 		initialLocation?: {
@@ -19,13 +17,6 @@
 			houseNumber?: string | null;
 			postcode?: string | null;
 		} | null;
-		// Forces the picker open from the start even without an initialLocation — used by
-		// CheckinComposer, where a location is required and shouldn't be hidden behind a click.
-		startExpanded?: boolean;
-		// A checkin's title/slug are derived from the POI name (see routes/checkins/new), so it's
-		// not just decorative there like it is for a post's optional location — used by
-		// CheckinComposer to drop the "(optional)" label and add real `required` validation.
-		requirePoiName?: boolean;
 		onChange?: () => void;
 	} = $props();
 	const componentId = $props.id();
@@ -34,7 +25,7 @@
 
 	// Only the initial value matters for all of these — later prop changes shouldn't clobber a
 	// location the user is actively editing.
-	let expanded = $state(untrack(() => initialLocation !== null || startExpanded));
+	let expanded = $state(untrack(() => initialLocation !== null));
 	let mapContainer = $state<HTMLDivElement>();
 	let map: LeafletNS.Map | undefined;
 	let marker: LeafletNS.Marker | undefined;
@@ -467,13 +458,8 @@
 				<input type="text" bind:value={locationCountry} />
 			</label>
 			<label>
-				{requirePoiName ? 'Ortsname' : 'POI-Name (optional)'}
-				<input
-					type="text"
-					bind:value={locationName}
-					placeholder="z. B. Elbwiesen"
-					required={requirePoiName}
-				/>
+				POI-Name (optional)
+				<input type="text" bind:value={locationName} placeholder="z. B. Elbwiesen" />
 			</label>
 			{#if road || postcode}
 				<p class="address-display">

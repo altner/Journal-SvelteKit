@@ -7,11 +7,12 @@ import { isProtectedPath, safeInternalRedirect } from '$lib/server/redirect';
 // SvelteKit generiert dafür einen Nonce für seinen eigenen Inline-Bootstrap-<script> und hängt ihn
 // automatisch an script-src an, was von Hand im hook nicht ginge.
 
-// Only /api/micropub/checkin is meant to be called cross-origin from a browser (osm-checkin, or
-// any future IndieAuth-authenticated Micropub client) — it carries no cookies, only a Bearer
-// token, so reflecting the request's Origin back is safe. post/album stay same-origin-only
-// (Apple Shortcut, no browser CORS involved).
-const CORS_PATHS = ['/api/micropub/checkin'];
+// /api/micropub/checkin and /api/micropub/post are meant to be called cross-origin from a
+// browser (osm-checkin, the Quill editor, or any future IndieAuth-authenticated Micropub client)
+// — both carry no cookies, only a Bearer token, so reflecting the request's Origin back is safe.
+// album stays same-origin-only (Apple Shortcut, no browser CORS involved) since no browser client
+// creates albums directly.
+const CORS_PATHS = ['/api/micropub/checkin', '/api/micropub/post'];
 
 function isCorsPath(pathname: string) {
 	return CORS_PATHS.includes(pathname);

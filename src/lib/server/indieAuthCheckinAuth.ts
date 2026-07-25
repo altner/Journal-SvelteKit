@@ -4,9 +4,10 @@ import { db } from '$lib/server/db';
 import { user } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 
-// Used only by routes/api/micropub/checkin — verifies the Bearer token against an external
-// IndieAuth server's /introspect endpoint (see /Users/adrian/Projects/indie-auth), unlike
-// micropubAuth.ts's static-token check still used by the post/album endpoints.
+// Verifies Bearer tokens against an external IndieAuth server's /introspect endpoint (see
+// /Users/adrian/Projects/indie-auth). Used by routes/api/micropub/checkin (only auth path) and,
+// via verifyIndieAuthCreateScope, as a fallback auth path for routes/api/micropub/post alongside
+// micropubAuth.ts's static-token check (album stays static-token-only, no IndieAuth path).
 interface IntrospectionResult {
 	active: boolean;
 	me?: string;
@@ -24,6 +25,22 @@ async function introspectToken(token: string, fetchFn: typeof fetch): Promise<In
 	});
 	if (!res.ok) return { active: false };
 	return (await res.json()) as IntrospectionResult;
+}
+
+/** Bearer-token-only IndieAuth check (introspection + `me`/`create`-scope check), without the
+ *  owner-resolution step — callers that already have their own owner lookup (e.g. micropubAuth.ts)
+ *  can use this instead of authorizeIndieAuthCheckinRequest to avoid a second, redundant DB lookup
+ *  path. Returns a boolean instead of throwing, since callers here need to fall through to a
+ *  different auth method (the static token) rather than fail immediately. */
+export async function verifyIndieAuthCreateScope(
+	token: string,
+	fetchFn: typeof fetch
+): Promise<boolean> {
+	const result = await introspectToken(token, fetchFn);
+	const expectedMe = env.INDIEAUTH_ME;
+	if (!expectedMe) throw error(500, 'INDIEAUTH_ME is not configured');
+	const scopes = (result.scope ?? '').split(' ').filter(Boolean);
+	return result.active === true && result.me === expectedMe && scopes.includes('create');
 }
 
 /** Verifies the Authorization Bearer token via IndieAuth introspection, checks it was issued for

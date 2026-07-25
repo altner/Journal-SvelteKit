@@ -86,20 +86,22 @@ Wichtig:
 ## Seiten
 
 - `/` – Feed, neueste Posts zuerst
-- `/posts/new` – Post erstellen (Text, Fotos, Album-Option)
 - `/photos` – Foto-Stream (nur Einzelfotos ohne Album)
 - `/albums` – Alle Alben
-- `/albums/[id]` – Album-Detail mit allen zugehörigen Fotos
+- `/albums/[slug]` – Album-Detail mit allen zugehörigen Fotos
 - `/login` – Anmelden
+
+Post/Checkin/Album-*Erstellung* gibt es nicht mehr als eigene Seite — siehe API unten.
 
 ## API
 
-Für externe Clients (z. B. eigene Apple Shortcuts) gibt es private, token-authentifizierte
-Endpunkte zum Erstellen von Checkins, Posts und Alben — siehe [docs/api.md](docs/api.md).
+Erstellen von Posts, Checkins und Alben läuft ausschließlich über private, token-authentifizierte
+Micropub-Endpunkte (eigene Apple Shortcuts per statischem Token, oder ein IndieAuth-Client wie der
+separate Quill-Editor) — siehe [docs/api.md](docs/api.md). Bearbeiten/Löschen bereits bestehender
+Einträge bleibt normale Web-UI.
 
 ## Bekannte Grenzen / mögliche nächste Schritte
 
-- Kein Bearbeiten/Löschen von Posts, Fotos oder Alben (nur Erstellen + Ansehen)
 - Kein Passwort-Reset-Flow (Passwort ggf. per `create-user`-Skript neu anlegen)
 - Aktuell auf einen "Autor" ausgelegt; das Datenmodell trägt eine `authorId`, mehrere Accounts
   sind also grundsätzlich möglich, es gibt aber (noch) keine Rechteverwaltung zwischen Nutzern
