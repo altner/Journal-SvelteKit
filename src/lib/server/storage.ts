@@ -1,4 +1,4 @@
-import { mkdir, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import sharp from 'sharp';
@@ -44,6 +44,24 @@ export async function saveUploadedTrackFile(
 	const buffer = Buffer.from(await file.arrayBuffer());
 	await writeFile(path.join(UPLOAD_DIR, filename), buffer);
 	return { filename };
+}
+
+// Reads back the dimensions of an already-saved photo (e.g. one uploaded via the Micropub media
+// endpoint, then referenced by filename in a later checkin/post creation request) — same `sharp`
+// metadata read saveUploadedPhoto already does inline, just against a file already on disk instead
+// of a fresh upload buffer. Returns null (not throw) for a missing/corrupt file, since a caller
+// referencing a stale/bogus filename should skip that photo rather than fail the whole request.
+export async function readUploadedPhotoDimensions(
+	filename: string
+): Promise<{ width: number; height: number } | null> {
+	try {
+		const buffer = await readFile(uploadFilePath(filename));
+		const metadata = await sharp(buffer).metadata();
+		if (!metadata.width || !metadata.height) return null;
+		return { width: metadata.width, height: metadata.height };
+	} catch {
+		return null;
+	}
 }
 
 export function uploadFilePath(filename: string): string {

@@ -27,17 +27,11 @@ export function buildPostExcerpt(
 	return `${truncated.slice(0, lastSpace > 0 ? lastSpace : maxLen)}…`;
 }
 
-/** Picks the filename of the photo to use as a post's og:image. Replicates the "origin post shows
- *  the album's current photos, not just its own" rendering quirk (see CLAUDE.md) — otherwise the
- *  OG image of an origin post wouldn't reflect photos added to its album later via `addPhotos`. */
+/** Picks the filename of the photo to use as a post's og:image — the first photo of the first
+ *  photos-block. */
 export function pickPostOgImage(post: {
-	id: string;
 	blocks: { type: string; photos: { filename: string }[] }[];
-	album: { originPostId: string | null; photos: { filename: string }[] } | null;
 }): string | null {
-	if (post.album && post.album.originPostId === post.id) {
-		return post.album.photos[0]?.filename ?? null;
-	}
 	for (const block of post.blocks) {
 		if (block.type === 'photos' && block.photos.length > 0) return block.photos[0].filename;
 	}

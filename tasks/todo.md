@@ -1,5 +1,151 @@
 # Todo
 
+## Foto-Support für `/api/micropub/checkin` via Micropub-Media-Endpoint — erledigt
+
+Nutzerwunsch: osm-checkin (`/Users/adrian/Projects/personal/osm-checkin/`) hatte einen Checkin mit
+Foto erstellt, das Foto tauchte aber nicht auf `/checkins/[slug]` auf. Ursache: zwei fehlende
+Bausteine, beide schon im Code als bekannte Lücke kommentiert gewesen ("v1 over IndieAuth has no
+photo support"). osm-checkin nutzt das Micropub-Media-Endpoint-Muster (Foto separat hochladen,
+zurückgegebene URL im `properties.photo` des JSON-h-entry referenzieren) — das gab es bei
+achis.blog schlicht noch nicht, also wurde das Foto beim Config-Discovery-Check
+(`?q=config` → kein `media-endpoint` gemeldet) still übersprungen, ohne Fehlermeldung.
+
+- [x] `src/lib/server/storage.ts`: `readUploadedPhotoDimensions(filename)` neu — liest Breite/Höhe
+      einer bereits gespeicherten Datei nach (der Media-Endpoint gibt in seiner Antwort keine
+      Maße zurück, nur die `Location`-URL)
+- [x] `src/lib/server/checkinBlocks.ts`: `saveAlreadyUploadedCheckinPhotos(checkinId, photos,
+      options)` neu — legt einen Foto-Block für bereits auf der Platte liegende Dateien an, ohne
+      erneuten Upload (Gegenstück zu `saveNewCheckinBlocks`, das multipart-Uploads erwartet)
+- [x] `src/routes/api/micropub/media/+server.ts` (neu): Micropub-Media-Endpoint — nimmt `file` per
+      multipart entgegen (IndieAuth-Bearer, `create`-Scope, kein statischer Token), speichert via
+      `saveUploadedPhoto()`, gibt `Location: {origin}/uploads/{filename}` zurück
+- [x] `src/routes/api/micropub/checkin/+server.ts`: neuer `GET`-Handler für `?q=config` (meldet den
+      Media-Endpoint); `POST` löst `properties.photo`-URLs jetzt auf — nur solche, die auf die
+      eigene `{origin}/uploads/`-Route zeigen (`extractOwnUploadFilename`), alles andere wird
+      übersprungen statt versucht herunterzuladen
+- [x] `src/hooks.server.ts`: `/api/micropub/media` zu `CORS_PATHS` ergänzt; `Access-Control-Allow-
+      Methods` um `GET` erweitert (für die `?q=config`-Abfrage)
+- [x] `docs/api.md`: Checkin-Abschnitt korrigiert (war schon vorher veraltet — beschrieb noch das
+      alte Form-Encoded-Schema statt der tatsächlichen JSON/IndieAuth-Realität) + neue Abschnitte
+      für `GET ?q=config` und `POST /api/micropub/media`
+- [x] `CLAUDE.md`: neuer Absatz zum Media-Endpoint-Foto-Flow
+- [x] `npm run check` / `npm run build` — 0 Fehler
+- [x] Live im Dev-Server end-to-end getestet (echter IndieAuth-Server lokal nicht verfügbar, daher
+      ein minimaler Mock-Introspect-Server auf Port 8080 verwendet): `?q=config` meldet den
+      Media-Endpoint korrekt, Foto-Upload gegen `/api/micropub/media` liefert die erwartete
+      `Location`-URL, ein Checkin mit `properties.photo` auf diese URL legt tatsächlich einen
+      `checkin_photo`-Eintrag an und zeigt das Foto korrekt auf `/checkins/[slug]` inkl.
+      funktionierendem Lightbox-Link. Testdaten (DB-Zeilen + Upload-Datei) danach wieder entfernt.
+
+## Album komplett unabhängig von Post machen (wie Checkin/Activity) — erledigt
+
+Nutzerwunsch: `/posts` soll nichts mehr mit Alben zu tun haben. Checkin und Activity sind schon
+komplett eigenständig (eigene `checkin_photo`/`activity_photo`-Tabellen, kein Bezug zu `post`).
+Album ist der Ausreißer: Album-Fotos hängen an der gemeinsamen `photo`-Tabelle, jedes Album-Foto
+braucht zwingend einen `post` als Träger (`photo.postId` NOT NULL), und es gibt die ganze
+"Origin-Post wächst im Feed"-Sonderlogik (`PostCard.svelte`s `isOrigin`, `seo.ts`s
+`pickPostOgImage`, `post.isStatusPost`/`post.albumId`/`album.originPostId`). Der Feed soll
+stattdessen ein reiner Aggregator über vier unabhängige Bereiche werden (Post/Checkin/
+Activity/Album), inkl. eines "Fotos zu bestehendem Album hinzugefügt"-Signals — bisher nur über
+einen unsichtbaren Fake-Post (`isStatusPost: true`) simuliert.
+
+**Wichtiger Fund während der Analyse, der den Plan beeinflusst hat:** Auf `/photos` gab es einen
+dritten Album-Erstellungsweg (`createAlbumFromSelection`) — lose Einzelfotos, die schon zu einem
+Post gehören, per Mehrfachauswahl zu einem neuen Album zusammenfassen, **ohne neuen Post**
+(`photo.albumId` wird auf ein bestehendes Foto-Row gesetzt, `originPostId: null`). Das setzt
+voraus, dass ein Foto gleichzeitig zu Post *und* Album gehören kann — genau das geht nicht mehr,
+wenn Album-Fotos in eine eigene Tabelle wandern. Nutzerentscheidung: **diese Funktion wird
+ersatzlos entfernt**, Alben entstehen nur noch direkt mit eigenen Fotos (Web-Formular oder
+Micropub).
+
+Ziel-Schema:
+- `album`: `id`, `title` (NOT NULL), `description`, `slug`, `authorId`, `createdAt` —
+  `originPostId` entfällt
+- neue Tabelle `album_photo` (mirrors `checkin_photo`/`activity_photo`): `id`, `filename`,
+  `originalName`, `width`, `height`, `albumId` (NOT NULL, cascade), `position`, `createdAt` — kein
+  `excludeFromStream` (ergibt für ein eigenständiges Album keinen Sinn), keine Blöcke (kein
+  Text/Foto-Mix nötig — freier Text lebt allein in `album.description`)
+- `post.albumId`, `post.isStatusPost`, `photo.albumId` entfallen komplett
+
+Feed-Signal-Ableitung ohne Fake-Post: `album_photo`-Zeilen einer Alben-ID nach exakt gleichem
+`createdAt` gruppieren (ein Request setzt für alle seine Foto-Inserts dieselbe `Date`-Instanz ein,
+Gruppierung per exaktem Zeitstempel ist also verlässlich). Die Gruppe, deren `createdAt` dem
+`album.createdAt` entspricht, ist "Album erstellt" (zeigt Titel+Beschreibung+Fotos); jede spätere
+Gruppe ist "N Fotos zu Album X hinzugefügt" (nur Fotos, kein eigener Text — die
+Pro-Batch-Text-Caption, die es bei `addPhotos` mal gab, entfällt ersatzlos, da es dafür in einem
+Album ohne Blöcke keinen Platz mehr gibt; `album.description` bleibt der einzige Freitext).
+
+- [x] `src/lib/server/db/schema.ts`: `album_photo`-Tabelle + Relations neu; `album.originPostId`,
+      `post.albumId`, `post.isStatusPost`, `photo.albumId` raus; `albumRelations.photos` zeigt auf
+      `album_photo` statt `photo`
+- [x] `src/lib/server/albums.ts`: `createAlbumFromPost` raus, neue Funktionen für
+      Direkt-Erstellung (`createAlbum`) und Foto-Ergänzung (`addPhotosToAlbum`) gegen
+      `album_photo`, ohne jeden Post-Bezug
+- [x] `src/routes/albums/+page.server.ts` (`createAlbum`-Action): legt nur noch `album` +
+      `album_photo` an, kein `post` mehr
+- [x] `src/routes/albums/[slug]/+page.server.ts`: `addPhotos`/`deletePhoto`/`deleteAlbum` gegen
+      `album_photo` statt gegen Fotos/Posts, die zum Album beigetragen haben; `addPhotos`-Textfeld
+      entfällt (kein Ziel mehr dafür)
+- [x] `src/routes/albums/[slug]/+page.svelte`: "Text (optional)"-Feld im Add-Photos-Formular
+      entfernen
+- [x] `src/routes/api/micropub/album/+server.ts`: legt nur noch `album` + `album_photo` an, kein
+      `post`; `content`-Feld entfällt (kein Ziel mehr dafür, `description` bleibt)
+- [x] `src/routes/photos/+page.server.ts` + `+page.svelte`: `createAlbumFromSelection`-Action und
+      die Mehrfachauswahl-UI komplett entfernt; `album`-Relation aus der Foto-Query raus
+- [x] `src/lib/server/posts.ts`: `deletePostCascade` verliert die `album.originPostId`-Nullung
+      (Album-Bezug komplett raus aus `DeletablePost`); `isPostNowEmpty` verliert den
+      `isStatusPost`-Sonderfall
+- [x] `src/lib/server/postDetail.ts`: `album`-Relation aus Load/Delete-Query raus; die
+      "automatische Album-Beiträge nicht bearbeitbar"-Sperre in der `edit`-Action raus
+      (`isStatusPost` gibt's nicht mehr)
+- [x] `src/lib/server/seo.ts`: `pickPostOgImage` verliert den Album-Sonderfall
+- [x] `src/lib/components/post/PostCard.svelte`: `album`-Prop, `isOrigin`,
+      `firstAlbumBlockId`-Sonderlogik komplett raus; Titel verlinkt nur noch `/posts/...`
+- [x] `src/routes/+page.server.ts` (Feed): neuer `album`-Item-Typ (zwei Varianten: erstellt/
+      aktualisiert) aus `album_photo`-Gruppen, gemerged mit Post/Checkin/Activity
+- [x] `src/lib/components/album/AlbumFeedCard.svelte` (neu): Feed-Karte nach Vorbild von
+      `CheckinCard`/`ActivityFeedCard`, zwei Varianten (erstellt: Titel+Beschreibung+Fotos;
+      aktualisiert: "N Fotos hinzugefügt"+Fotos), `DeleteAlbumButton`-Wiederverwendung
+- [x] `src/routes/+page.svelte`: neuen `album`-Kind rendern
+- [x] `CLAUDE.md` / `README.md` / `docs/api.md`: Datenmodell- und Feed-Abschnitte auf das neue,
+      unabhängige Album-Modell umgeschrieben; Origin-Post-Doku raus
+- [x] `scripts/migrate-albums-standalone.mjs` (neu, einmaliges Migrationsskript, **vom Nutzer
+      selbst auszuführen, nicht von Claude**): bestehende `photo`-Zeilen mit `albumId` nach
+      `album_photo` kopieren; zugehörige Origin-/Status-Posts behandeln (Status-Posts löschen,
+      echte Posts mit eigenem Inhalt als eigenständigen Post ohne Album-Bezug behalten, falls nach
+      Foto-Entfernung noch Inhalt übrig ist, sonst löschen); alte `album_photo`-Duplikate aus
+      `photo` entfernen
+- [x] `npm run check` / `npm run build` — 0 Fehler
+
+**Reihenfolge für den Rollout (Host-Arbeit, nicht von Claude ausgeführt):** (A) `album_photo`-Tabelle
+in Produktion anlegen (neue Tabelle ist immer verlustfrei per `db:push` oder manuellem
+`CREATE TABLE`) → (B) Migrationsskript gegen Produktions-DB laufen lassen (`node --env-file=.env
+scripts/migrate-albums-standalone.mjs` = Dry-Run, `--apply` schreibt wirklich; braucht nur, dass
+die alten Spalten `photo.album_id`/`post.album_id`/`post.is_status_post`/`album.origin_post_id`
+noch physisch existieren, unabhängig vom App-Code) → (C) neuen Code deployen → (D) optional die
+jetzt ungenutzten alten Spalten per `ALTER TABLE ... DROP COLUMN` aufräumen, sobald alles geprüft
+ist.
+
+**Live im Dev-Server getestet** (lokale `album_photo`-Tabelle manuell per `sqlite3` angelegt, da
+`db:push` hier nicht blind ausgeführt werden darf — Produktion braucht denselben Schritt, siehe
+oben): Album mit 2 Testfotos über die `createAlbum`-Action angelegt → erscheint korrekt im Feed
+(`AlbumFeedCard`, "📁 Test Album" + Beschreibung + Fotos) und auf der eigenen Album-Seite mit
+funktionierenden Lightbox-Links; einzelnes Foto über `/photos`' `deletePhoto`-Action gelöscht →
+Zeile korrekt aus `album_photo` entfernt; Album über `deleteAlbum` gelöscht. Kein voller
+IndieAuth-Browser-Login getestet (Session stattdessen direkt per `sqlite3` gesetzt), aber Actions
+selbst end-to-end verifiziert.
+
+**Zusatz (Nutzerwunsch danach): `/photos` aggregiert jetzt auch Album- und Checkin-Fotos.** War
+vorher nur Post- + Activity-Fotos (Checkin-Fotos waren noch nie dabei, Album-Fotos früher indirekt
+über die gemeinsame `photo`-Tabelle). Beide `routes/photos/+page.server.ts` (Haupt-Stream) und
+`routes/photos/[photoId]/+page.server.ts` (Standalone-Permalink-Fallback) fragen jetzt alle vier
+Foto-Quellen ab (`photo`/`activity_photo`/`checkin_photo`/`album_photo`) und mergen sie chronologisch,
+`deletePhoto` probiert beim Löschen alle vier Tabellen durch. Neu: `pruneEmptyCheckinPhotoBlocks`
+in `checkinBlocks.ts` (mirrors `pruneEmptyPhotoBlocks`) — anders als bei Posts wird ein Checkin aber
+nie automatisch gelöscht, nur weil er keine Fotos mehr hat (die Location bleibt sinnvoller Inhalt).
+Live getestet: Album-Fotos tauchen jetzt korrekt in `/photos` auf, Origin-Link zeigt richtig aufs
+Album, Löschen über den aggregierten `deletePhoto` funktioniert.
+
 ## Login auf IndieAuth (indie-auth.altner.cloud) umgestellt, Passwort-Login entfernt — erledigt
 
 Nutzerwunsch: der Website-Login (nicht die Micropub-Endpunkte, die haben schon IndieAuth) soll

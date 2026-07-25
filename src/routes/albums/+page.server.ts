@@ -1,11 +1,9 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
-import { and, asc, desc, eq, gt, inArray, lt, or } from 'drizzle-orm';
-import { album, photo, post } from '$lib/server/db/schema';
-import { saveNewPostBlocks, type BlockMeta } from '$lib/server/blocks';
-import { generateAlbumSlug } from '$lib/server/albums';
-import { randomUUID } from 'node:crypto';
+import { and, asc, desc, eq, gt, lt, or } from 'drizzle-orm';
+import { album } from '$lib/server/db/schema';
+import { createAlbum } from '$lib/server/albums';
 import { finishPage, PAGE_SIZE, readPageCursor } from '$lib/server/pagination';
 
 export const load: PageServerLoad = async ({ url }) => {
@@ -52,42 +50,13 @@ export const actions: Actions = {
 			return fail(400, { error: 'Ein Album braucht mindestens zwei Fotos.' });
 		}
 
-		const createdAt = new Date();
+		const { albumSlug } = await createAlbum(
+			{ title: albumTitle || 'Neues Album', description: albumDescription || null },
+			files,
+			user.id,
+			new Date()
+		);
 
-		const [createdPost] = await db
-			.insert(post)
-			.values({ title: albumTitle || null, authorId: user.id, createdAt })
-			.returning();
-
-		const blockId = randomUUID();
-		const blocksMeta: BlockMeta[] = [
-			{ id: blockId, type: 'photos', fileField: 'photos', excludeFromStream: false }
-		];
-		const { nonExcludedPhotoIds } = await saveNewPostBlocks(createdPost.id, blocksMeta, data);
-
-		const albumTitleFinal = albumTitle || 'Neues Album';
-		const albumId = randomUUID();
-		const albumSlug = await generateAlbumSlug(albumTitleFinal, albumId);
-
-		const [createdAlbum] = await db
-			.insert(album)
-			.values({
-				id: albumId,
-				slug: albumSlug,
-				title: albumTitleFinal,
-				description: albumDescription || null,
-				originPostId: createdPost.id,
-				authorId: user.id,
-				createdAt
-			})
-			.returning();
-
-		await db.update(post).set({ albumId: createdAlbum.id }).where(eq(post.id, createdPost.id));
-		await db
-			.update(photo)
-			.set({ albumId: createdAlbum.id })
-			.where(inArray(photo.id, nonExcludedPhotoIds));
-
-		throw redirect(303, `/albums/${encodeURIComponent(createdAlbum.slug ?? createdAlbum.id)}`);
+		throw redirect(303, `/albums/${encodeURIComponent(albumSlug)}`);
 	}
 };

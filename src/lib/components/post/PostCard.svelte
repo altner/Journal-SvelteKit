@@ -26,16 +26,8 @@
 			slug: string | null;
 			title: string | null;
 			createdAt: Date | string;
-			isStatusPost: boolean;
 			anchorId?: string | null;
 			blocks: Block[];
-			album: {
-				id: string;
-				slug: string | null;
-				title: string;
-				originPostId: string | null;
-				photos: { id: string; filename: string; postId: string; width: number | null; height: number | null }[];
-			} | null;
 			tags: { id: string; name: string; slug: string }[];
 			latitude: number | null;
 			longitude: number | null;
@@ -75,10 +67,6 @@
 		return block.type === 'photos' && block.photos.length > 0 && block.photos.every((p) => !!p.excludeFromStream);
 	}
 
-	const isOrigin = $derived(post.album != null && post.album.originPostId === post.id);
-	const firstAlbumBlockId = $derived(
-		isOrigin ? post.blocks.find((b) => b.type === 'photos' && !isExcludedBlock(b))?.id ?? null : null
-	);
 	const firstVisiblePhotoBlockId = $derived(
 		post.blocks.find((block) => block.type === 'photos' && block.photos.length > 0)?.id ?? null
 	);
@@ -116,11 +104,7 @@
 				<h1 class="post-title detail-title">{post.title || 'Ohne Titel'}</h1>
 			{:else if !editing}
 					<h2 class="post-title">
-						{#if post.album}
-							<a href="/albums/{post.album.slug ?? post.album.id}">{post.title || 'Ohne Titel'}</a>
-						{:else}
-							<a href="/posts/{post.slug ?? post.id}">{post.title || 'Ohne Titel'}</a>
-						{/if}
+						<a href="/posts/{post.slug ?? post.id}">{post.title || 'Ohne Titel'}</a>
 					</h2>
 			{/if}
 			<div class="post-sub">
@@ -146,7 +130,7 @@
 		</div>
 		{#if user}
 			<OwnerActions label="Beitragsaktionen">
-				{#if !post.isStatusPost && !editing}
+				{#if !editing}
 					<button type="button" class="edit-btn" onclick={startEditing}>Bearbeiten</button>
 				{/if}
 				<DeletePostButton postSlug={post.slug ?? post.id} {afterDelete} />
@@ -178,9 +162,7 @@
 				{#if block.text?.trim()}
 					<div class="post-text">{@html renderMarkdownToSafeHtml(block.text)}</div>
 				{/if}
-			{:else if block.id === firstAlbumBlockId}
-				<PhotoGrid photos={post.album?.photos ?? []} priority={priority && block.id === firstVisiblePhotoBlockId} />
-			{:else if !(isOrigin && !isExcludedBlock(block))}
+			{:else}
 				<PhotoGrid photos={block.photos} priority={priority && block.id === firstVisiblePhotoBlockId} />
 			{/if}
 		{/each}

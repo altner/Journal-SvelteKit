@@ -3,6 +3,7 @@
 	import PostCard from '$lib/components/post/PostCard.svelte';
 	import ActivityFeedCard from '$lib/components/activity/ActivityFeedCard.svelte';
 	import CheckinCard from '$lib/components/checkin/CheckinCard.svelte';
+	import AlbumFeedCard from '$lib/components/album/AlbumFeedCard.svelte';
 	import Pagination from '$lib/components/shared/Pagination.svelte';
 	let { data }: { data: PageData } = $props();
 
@@ -27,7 +28,7 @@
 		</p>
 	{/if}
 
-	{#each data.items as item, index (item.kind === 'post' ? item.post.id : item.kind === 'checkin' ? item.checkin.id : item.activity.id)}
+	{#each data.items as item, index (item.kind === 'post' ? item.post.id : item.kind === 'checkin' ? item.checkin.id : item.kind === 'album' ? item.album.eventKey : item.activity.id)}
 		{#if item.kind === 'post'}
 			<PostCard
 				post={item.post}
@@ -46,6 +47,8 @@
 				onEdit={() => (editingId = item.checkin.id)}
 				onEditDone={() => (editingId = null)}
 			/>
+		{:else if item.kind === 'album'}
+			<AlbumFeedCard event={item.album} priority={index === 0} user={data.user} />
 		{:else}
 			<ActivityFeedCard
 				activity={item.activity}

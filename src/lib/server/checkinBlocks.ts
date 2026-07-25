@@ -4,9 +4,9 @@ import { saveUploadedPhoto, deleteUploadedPhoto } from '$lib/server/storage';
 import { eq, desc } from 'drizzle-orm';
 import type { BlockMeta } from '$lib/server/blocks';
 
-// parseBlocksMeta, blocksMetaHasContent, and countNonExcludedNewFiles from lib/server/blocks.ts
-// are generic (no postId/checkinId reference) and are reused as-is by callers of this module —
-// only the checkin_block/checkin_photo-writing functions below need a checkin-specific copy of
+// parseBlocksMeta and blocksMetaHasContent from lib/server/blocks.ts are generic (no
+// postId/checkinId reference) and are reused as-is by callers of this module — only the
+// checkin_block/checkin_photo-writing functions below need a checkin-specific copy of
 // blocks.ts's post_block/photo counterparts.
 
 type ExistingBlock = {
@@ -68,6 +68,54 @@ export async function saveNewCheckinBlocks(
 	}
 
 	return { nonExcludedPhotoIds };
+}
+
+/** Inserts a single photos-block containing photos that were already saved to disk beforehand
+ *  (via the Micropub media endpoint, see routes/api/micropub/media) rather than uploaded directly
+ *  in this request's multipart body — used by routes/api/micropub/checkin's photo support, since
+ *  osm-checkin (and Micropub media-endpoint clients generally) upload the file separately first
+ *  and only reference its resulting URL in the h-entry JSON. No-op if `photos` is empty (no block
+ *  gets created for zero photos, mirroring saveNewCheckinBlocks skipping empty blocks). */
+export async function saveAlreadyUploadedCheckinPhotos(
+	checkinId: string,
+	photos: { filename: string; width: number; height: number; originalName?: string | null }[],
+	options: { startBlockPosition?: number; startPhotoPosition?: number } = {}
+): Promise<void> {
+	if (photos.length === 0) return;
+
+	const [createdBlock] = await db
+		.insert(checkinBlock)
+		.values({ checkinId, position: options.startBlockPosition ?? 0, type: 'photos' })
+		.returning();
+
+	let photoPosition = options.startPhotoPosition ?? 0;
+	for (const p of photos) {
+		await db.insert(checkinPhoto).values({
+			filename: p.filename,
+			width: p.width,
+			height: p.height,
+			originalName: p.originalName ?? null,
+			checkinId,
+			blockId: createdBlock.id,
+			position: photoPosition++
+		});
+	}
+}
+
+/** Deletes a checkin_block row left with zero photos after a single photo was removed (e.g. via
+ *  /photos' aggregated deletePhoto action). Mirrors pruneEmptyPhotoBlocks in blocks.ts — unlike
+ *  posts, a checkin is never deleted just for losing its photos (its location is the core
+ *  content), so this only prunes the empty block shell, nothing more. */
+export async function pruneEmptyCheckinPhotoBlocks(checkinId: string): Promise<void> {
+	const blocks = await db.query.checkinBlock.findMany({
+		where: eq(checkinBlock.checkinId, checkinId),
+		with: { photos: true }
+	});
+	for (const block of blocks) {
+		if (block.type === 'photos' && block.photos.length === 0) {
+			await db.delete(checkinBlock).where(eq(checkinBlock.id, block.id));
+		}
+	}
 }
 
 /** Reconciles a checkin's existing blocks against a freshly-submitted blocksMeta array. Mirrors

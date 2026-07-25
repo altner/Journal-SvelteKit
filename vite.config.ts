@@ -17,11 +17,13 @@ export default defineConfig({
 			},
 			// SvelteKit's built-in CSRF check blocks cross-site form-content-type POSTs (multipart/
 			// form-data, x-www-form-urlencoded) before `handle` even runs, regardless of the CORS
-			// headers set there — it protects cookie-based session routes, but /api/micropub/post
-			// authenticates via Bearer token only, so it needs an explicit trusted-origin exemption.
-			// /api/micropub/checkin isn't affected since it sends a JSON body, not form-content-type.
+			// headers set there — it protects cookie-based session routes, but /api/micropub/post and
+			// /api/micropub/media authenticate via Bearer token only, so they need an explicit
+			// trusted-origin exemption. /api/micropub/checkin itself isn't affected (JSON body, not
+			// form-content-type) but its ?q=config GET is same-origin-check-exempt anyway (CSRF only
+			// applies to state-changing methods) — only the media upload needed adding here.
 			csrf: {
-				trustedOrigins: ['https://quill.altner.cloud']
+				trustedOrigins: ['https://quill.altner.cloud', 'https://osm-checkin.altner.cloud']
 			},
 			// SvelteKit generates a per-request nonce for its own inline bootstrap <script> (and any
 			// inline <style> from Svelte transitions) and adds it to these directives automatically -

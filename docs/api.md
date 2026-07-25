@@ -7,11 +7,13 @@ Registrierung, kein OAuth, keine Rate-Limits für Dritte.
 
 ## Micropub-artige Endpunkte (`/api/micropub/*`)
 
-Drei eigenständige Endpunkte, einer pro Inhaltstyp — bewusst **nicht** ein einzelner Endpoint mit
-Dispatch-Logik (das gab's kurzzeitig, war aber fehleranfällig, siehe `tasks/todo.md`). Alle drei
-teilen sich denselben Auth-Mechanismus.
+Eigenständige Endpunkte, einer pro Inhaltstyp — bewusst **nicht** ein einzelner Endpoint mit
+Dispatch-Logik (das gab's kurzzeitig, war aber fehleranfällig, siehe `tasks/todo.md`). Nicht alle
+teilen sich denselben Auth-Mechanismus — `checkin`/`media` sind IndieAuth-only (kein statischer
+Token), `post` akzeptiert beides, `album` nur den statischen Token. Details stehen jeweils beim
+Endpunkt; das Folgende gilt für `post`/`album` (den "klassischen", formularbasierten Pfad):
 
-### Auth (alle drei Endpunkte)
+### Auth (`post`/`album`)
 
 - Header `Authorization: Bearer <MICROPUB_TOKEN>` (aus `.env`, per `openssl rand -hex 32`
   generiert) — `401` bei fehlendem/falschem Token.
@@ -29,29 +31,73 @@ teilen sich denselben Auth-Mechanismus.
 ### `POST /api/micropub/checkin`
 
 Legt einen Checkin an (eigene Tabelle `checkin`, nicht `post` — siehe Datenmodell in
-`CLAUDE.md`).
+`CLAUDE.md`). **Abweichend vom Rest dieses Abschnitts:** kein statischer `MICROPUB_TOKEN`, nur ein
+echter IndieAuth-Bearer-Token (Introspection gegen `INDIEAUTH_INTROSPECT_URL`, Scope `create`,
+`me === INDIEAUTH_ME`) — und ein **JSON**-Body (Standard-Micropub-JSON-Syntax, `Content-Type:
+application/json`), keine Formulardaten. Das ist das Schema, das
+[osm-checkin](https://github.com/adrianaltner/osm-checkin) tatsächlich sendet: ein `h-entry`,
+dessen `checkin`-Property selbst eine `h-card` mit `name`/`latitude`/`longitude` ist.
 
-| Feld | Pflicht | Beschreibung |
+| Property | Pflicht | Beschreibung |
 | --- | --- | --- |
-| `checkin[latitude]` | ✅ | Numerisch, als String |
-| `checkin[longitude]` | ✅ | Numerisch, als String |
-| `checkin[name]` | – | Ortsname (z. B. Venue) |
+| `checkin[0].properties.latitude` | ✅ | Numerisch, als String |
+| `checkin[0].properties.longitude` | ✅ | Numerisch, als String |
+| `checkin[0].properties.name` | – | Ortsname (z. B. Venue) |
+| `checkin[0].properties.url` | – | Link zur Quelle (z. B. OSM-Node/-Way) |
 | `content` | – | Kurzer Text |
-| `photo` | – | Foto-Datei, mehrere über wiederholtes `photo`-Feld möglich |
+| `photo` | – | URL(s) einer zuvor über den Media-Endpoint hochgeladenen Datei (siehe unten) — **keine** Datei-Uploads direkt in diesem Request, da der Body JSON ist |
 
 Reichert `locationPlace`/`locationCountry`/`road`/`houseNumber`/`postcode` best-effort per
 Nominatim-Rückwärtssuche an (Fehler dabei sind nie fatal, Felder bleiben dann leer).
 
 **Antwort:** `Location: /checkins/{slug}`
 
-**Fehler:** `400` wenn `checkin[latitude]`/`checkin[longitude]` fehlen oder nicht numerisch sind.
+**Fehler:** `400` wenn `checkin[0].properties.latitude`/`.longitude` fehlen oder nicht numerisch
+sind, oder wenn der Body kein valides JSON ist.
 
 ```bash
 curl -i -X POST https://achis.blog/api/micropub/checkin \
-  -H "Authorization: Bearer $MICROPUB_TOKEN" -H "Origin: https://achis.blog" \
-  -F "h=entry" -F "checkin[name]=Café X" \
-  -F "checkin[latitude]=51.05" -F "checkin[longitude]=13.74" \
-  -F "content=Kurzer Kommentar" -F "photo=@bild.jpg"
+  -H "Authorization: Bearer $INDIEAUTH_ACCESS_TOKEN" -H "Origin: https://achis.blog" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": ["h-entry"],
+    "properties": {
+      "checkin": [{"properties": {"name": ["Café X"], "latitude": ["51.05"], "longitude": ["13.74"]}}],
+      "content": ["Kurzer Kommentar"],
+      "photo": ["https://achis.blog/uploads/<vom-media-endpoint-zurückgegebener-filename>.webp"]
+    }
+  }'
+```
+
+### `GET /api/micropub/checkin?q=config`
+
+Micropub-[Konfigurationsabfrage](https://micropub.spec.indieweb.org/#configuration) — so findet
+ein Client den Media-Endpoint. Gleiche Auth wie `POST` oben (IndieAuth-Bearer, `create`-Scope).
+
+**Antwort:** `200` mit `{"media-endpoint": "https://achis.blog/api/micropub/media"}`.
+
+### `POST /api/micropub/media`
+
+Micropub-[Media-Endpoint](https://micropub.spec.indieweb.org/#media-endpoint) — für Clients, die
+(wie osm-checkin) den eigentlichen Eintrag als JSON senden und deshalb Fotos nicht im selben
+Request mitschicken können: Datei hier separat hochladen, die zurückgegebene URL dann als `photo`
+im `POST /api/micropub/checkin`-Body referenzieren. Gleiche Auth wie `checkin` (IndieAuth-Bearer,
+`create`-Scope) — kein statischer Token.
+
+| Feld | Pflicht | Beschreibung |
+| --- | --- | --- |
+| `file` | ✅ | Die Bilddatei, `multipart/form-data` |
+
+**Antwort:** `201 Created`, `Location`-Header mit der URL der gespeicherten Datei (unter
+`/uploads/...`, wie jedes andere Foto — resized + als WebP re-encodiert, siehe
+`lib/server/storage.ts`).
+
+**Fehler:** `401` ohne/mit ungültigem Bearer-Token, `400` wenn `file` fehlt.
+
+```bash
+curl -i -X POST https://achis.blog/api/micropub/media \
+  -H "Authorization: Bearer $INDIEAUTH_ACCESS_TOKEN" -H "Origin: https://achis.blog" \
+  -F "file=@bild.jpg"
 ```
 
 ### `POST /api/micropub/post`
@@ -108,16 +154,16 @@ await fetch('https://achis.blog/api/micropub/post', {
 
 ### `POST /api/micropub/album`
 
-Legt ein eigenständiges Album an. Erstellt intern zwingend auch einen `post`-Trägereintrag
-(`photo.postId` ist schema-seitig `NOT NULL`), aber der Fokus des Endpoints liegt auf dem Album —
-kein separates Post-Titel-Feld, kein Pflichttext.
+Legt ein eigenständiges Album an — komplett unabhängig von `post`/`photo` (eigene `album`/
+`album_photo`-Tabellen, kein Trägerpost nötig). Derselbe Endpoint-Zweck existiert auch als
+Web-Formular ("+ Neues Album" auf `/albums`) — beide rufen intern dieselbe `createAlbum()`-Funktion
+(`lib/server/albums.ts`).
 
 | Feld | Pflicht | Beschreibung |
 | --- | --- | --- |
-| `title` | ✅ | Album-Titel (wird auch als Titel des Trägerposts verwendet) |
+| `title` | ✅ | Album-Titel |
 | `photo` | ✅ (≥ 2) | Foto-Dateien, wiederholtes Feld |
-| `description` | – | Album-Beschreibung |
-| `content` | – | Optionaler Text am Trägerpost |
+| `description` | – | Album-Beschreibung — einziges Freitextfeld, kein separates `content` |
 
 **Antwort:** `Location: /albums/{slug}` (nicht `/posts/…` — bewusst der Album-Link)
 
@@ -186,9 +232,10 @@ bereinigt (Schutz vor Path Traversal). `Cache-Control: public, max-age=31536000,
 
 ## Formular-Actions
 
-Post/Checkin/Album-*Erstellung* läuft ausschließlich über die Micropub-Endpunkte oben — es gibt
-kein Web-Formular dafür mehr. Bearbeiten und Löschen bereits existierender Posts/Checkins/Aktivitäten/
-Alben läuft weiterhin über SvelteKit Form Actions auf den jeweiligen Detailseiten (`/posts/[slug]`,
-`/checkins/[slug]`, `/activities`, `/activities/[slug]`, `/albums/[slug]`, `/photos`) — das sind
-keine JSON/REST-Endpunkte, sondern normale HTML-Formular-Submits mit Session-Cookie-Auth, nicht Teil
-dieser API-Referenz.
+Post/Checkin-*Erstellung* läuft ausschließlich über die Micropub-Endpunkte oben — es gibt kein
+Web-Formular dafür mehr. Album-Erstellung ist die Ausnahme: `/albums`' "+ Neues Album"-Formular
+(`createAlbum`-Action) legt Alben direkt an, gleichberechtigt neben `/api/micropub/album`. Bearbeiten
+und Löschen bereits existierender Posts/Checkins/Aktivitäten/Alben läuft über SvelteKit Form Actions
+auf den jeweiligen Seiten (`/posts/[slug]`, `/checkins/[slug]`, `/activities`, `/activities/[slug]`,
+`/albums`, `/albums/[slug]`, `/photos`) — das sind keine JSON/REST-Endpunkte, sondern normale
+HTML-Formular-Submits mit Session-Cookie-Auth, nicht Teil dieser API-Referenz.

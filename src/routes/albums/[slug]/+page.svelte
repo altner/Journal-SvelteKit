@@ -66,7 +66,7 @@
 	let submittingPhotos = $state(false);
 	let addPhotosDirty = $state(false);
 	let addPhotosToggle: HTMLButtonElement | undefined = $state();
-	let addPhotosText: HTMLTextAreaElement | undefined = $state();
+	let addPhotosFileInput: HTMLInputElement | undefined = $state();
 	let addPhotosErrorMessage: HTMLParagraphElement | undefined = $state();
 
 	function onFilesChange(e: Event) {
@@ -90,7 +90,7 @@
 		if (!addingPhotos) addPhotosDirty = false;
 		if (addingPhotos) {
 			await tick();
-			addPhotosText?.focus();
+			addPhotosFileInput?.focus();
 		}
 	}
 </script>
@@ -120,10 +120,6 @@
 
 	{#if data.album.description}
 		<p class="description">{data.album.description}</p>
-	{/if}
-
-	{#if data.album.originPostId}
-		<a class="origin" href="/posts/{data.originPostSlug}">Zum ursprünglichen Beitrag</a>
 	{/if}
 
 	{#if data.user}
@@ -182,18 +178,15 @@
 			{/if}
 
 			<label>
-				Text (optional)
-				<textarea
-					bind:this={addPhotosText}
-					name="text"
-					rows="2"
-					placeholder="Was möchtest du dazu sagen?"
-				></textarea>
-			</label>
-
-			<label>
 				Fotos
-				<input type="file" name="photos" accept="image/*" multiple onchange={onFilesChange} />
+				<input
+					bind:this={addPhotosFileInput}
+					type="file"
+					name="photos"
+					accept="image/*"
+					multiple
+					onchange={onFilesChange}
+				/>
 			</label>
 			{#if fileCount > 0}
 				<p class="file-summary" aria-live="polite">
@@ -275,14 +268,6 @@
 		white-space: pre-wrap;
 		margin: 0 0 16px 0;
 	}
-	.origin {
-		display: inline-flex;
-		align-items: center;
-		min-height: 44px;
-		font-size: 13px;
-		color: var(--fb-blue);
-		margin-bottom: 16px;
-	}
 	.toggle-add {
 		margin-bottom: 16px;
 		background: none;
@@ -315,14 +300,6 @@
 		gap: 4px;
 		font-size: 13px;
 		color: var(--fb-gray);
-	}
-	.add-photos-form textarea {
-		padding: 10px 12px;
-		border: 1px solid var(--fb-border);
-		border-radius: 6px;
-		font-size: 15px;
-		font-family: inherit;
-		color: #050505;
 	}
 	.add-photos-form input[type='file'] {
 		font-size: 14px;

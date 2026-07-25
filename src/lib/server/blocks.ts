@@ -50,16 +50,6 @@ export function blocksMetaHasContent(
 	});
 }
 
-/** Total files attached to non-excluded photo blocks — used for the "album needs >=2 photos"
- *  check before anything is written, since "excluded" (e.g. infographic) blocks never count
- *  toward album eligibility. */
-export function countNonExcludedNewFiles(blocksMeta: BlockMeta[], formData: FormData): number {
-	return blocksMeta.reduce((sum, meta) => {
-		if (meta.type !== 'photos' || meta.excludeFromStream) return sum;
-		return sum + filesFor(meta, formData).length;
-	}, 0);
-}
-
 /** Inserts a fresh, ordered set of blocks for a post that doesn't have any yet (new post, or a
  *  new `addPhotos`-style status post). Skips blocks with no real content (empty text, no files).
  *  Returns the ids of newly-created, non-excluded photos — the caller uses these to decide album

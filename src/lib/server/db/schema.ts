@@ -30,11 +30,28 @@ export const album = sqliteTable('album', {
 	// URL slug, generated once at creation time and never changed again — see generateAlbumSlug
 	// in albums.ts. Nullable + unique for the same db:push-safety reason as post.slug.
 	slug: text('slug').unique(),
-	// The post that originally created this album
-	originPostId: text('origin_post_id'),
 	authorId: text('author_id')
 		.notNull()
 		.references(() => user.id, { onDelete: 'cascade' }),
+	createdAt: integer('created_at', { mode: 'timestamp' })
+		.notNull()
+		.$defaultFn(() => new Date())
+});
+
+// Own table, mirroring checkinPhoto/activityPhoto — an album is fully independent of post/photo,
+// not a special kind of post. A batch of album_photo rows sharing the exact same `createdAt` (one
+// JS Date instance per request, shared across every insert in that request) is what the feed uses
+// to derive "album created" vs "N photos added to album" events, see +page.server.ts.
+export const albumPhoto = sqliteTable('album_photo', {
+	id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+	filename: text('filename').notNull(),
+	originalName: text('original_name'),
+	width: integer('width'),
+	height: integer('height'),
+	albumId: text('album_id')
+		.notNull()
+		.references(() => album.id, { onDelete: 'cascade' }),
+	position: integer('position').notNull().default(0),
 	createdAt: integer('created_at', { mode: 'timestamp' })
 		.notNull()
 		.$defaultFn(() => new Date())
@@ -53,11 +70,6 @@ export const post = sqliteTable('post', {
 	authorId: text('author_id')
 		.notNull()
 		.references(() => user.id, { onDelete: 'cascade' }),
-	// set once an album is created from this post's photos
-	albumId: text('album_id').references(() => album.id, { onDelete: 'set null' }),
-	// true only for auto-generated "photos added" posts (albums/[id] addPhotos action) —
-	// those stay deletable but not editable.
-	isStatusPost: integer('is_status_post', { mode: 'boolean' }).notNull().default(false),
 	// GPS location, all nullable — a post can exist without one. Nullable, no default, so
 	// `db:push` can only ever emit a lossless ADD COLUMN for these (see CLAUDE.md: adding
 	// isStatusPost, a NOT NULL column even WITH a default, once made drizzle-kit propose
@@ -91,9 +103,6 @@ export const photo = sqliteTable('photo', {
 	postId: text('post_id')
 		.notNull()
 		.references(() => post.id, { onDelete: 'cascade' }),
-	// set only when this photo also belongs to an album; single photos stay null
-	// and remain in the general photo stream.
-	albumId: text('album_id').references(() => album.id, { onDelete: 'set null' }),
 	// which of the post's ordered blocks this photo belongs to.
 	blockId: text('block_id').references(() => postBlock.id, { onDelete: 'cascade' }),
 	// nullable, no default (like the GPS columns) so `db:push` can only ever emit a lossless
@@ -296,7 +305,6 @@ export const userRelations = relations(user, ({ many }) => ({
 
 export const postRelations = relations(post, ({ one, many }) => ({
 	author: one(user, { fields: [post.authorId], references: [user.id] }),
-	album: one(album, { fields: [post.albumId], references: [album.id] }),
 	photos: many(photo),
 	blocks: many(postBlock),
 	tags: many(postTag)
@@ -309,12 +317,15 @@ export const postBlockRelations = relations(postBlock, ({ one, many }) => ({
 
 export const albumRelations = relations(album, ({ one, many }) => ({
 	author: one(user, { fields: [album.authorId], references: [user.id] }),
-	photos: many(photo)
+	photos: many(albumPhoto)
+}));
+
+export const albumPhotoRelations = relations(albumPhoto, ({ one }) => ({
+	album: one(album, { fields: [albumPhoto.albumId], references: [album.id] })
 }));
 
 export const photoRelations = relations(photo, ({ one }) => ({
 	post: one(post, { fields: [photo.postId], references: [post.id] }),
-	album: one(album, { fields: [photo.albumId], references: [album.id] }),
 	block: one(postBlock, { fields: [photo.blockId], references: [postBlock.id] })
 }));
 

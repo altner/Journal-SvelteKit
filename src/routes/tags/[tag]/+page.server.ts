@@ -20,11 +20,6 @@ export const load: PageServerLoad = async ({ params, url }) => {
 						orderBy: (block, { asc }) => asc(block.position),
 						with: { photos: { orderBy: (photo, { asc }) => asc(photo.position) } }
 					},
-					album: {
-						with: {
-							photos: { orderBy: (photo, { asc }) => asc(photo.position) }
-						}
-					},
 					tags: { with: { tag: true } }
 				}
 			})

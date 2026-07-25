@@ -47,47 +47,53 @@ since the DDL ends up equivalent.
 `@libsql/client` (no native compilation needed) + hand-rolled session auth (no auth framework).
 
 **Data model** (`src/lib/server/db/schema.ts`):
-- `post` — optional title/text, always has an `authorId`, optionally an `albumId`, plus
-  `isStatusPost` (boolean, default `false`) marking auto-generated "photos added to album" posts
-  (see below) as distinct from user-authored ones. This is a real column, not a title-string
-  heuristic — deliberately, since matching on the generated title text would break if albums ever
-  become renameable, and can't be told apart from a user-typed title that happens to coincide.
-  `routes/posts/[id]/+page.server.ts`'s `edit` action checks this flag (`fail(403)` if true) —
-  status posts stay delete-only, never editable; the "Bearbeiten" button is hidden client-side for
-  the same reason but the server check is the actual guard.
-- `photo` — always belongs to exactly one `post` (`postId` not null). Only gets an `albumId` when
-  it was saved as part of an album; otherwise it's a "loose" photo and shows up in the `/photos`
-  stream.
-- `album` — created *from* a post (requires ≥2 photos + a checkbox at creation time), keeps a
-  reference back to the originating post via `originPostId` (purely historical — never updated
-  again after creation). More photos can be added later via `routes/albums/[id]/+page.server.ts`'s
-  `addPhotos` action, which does NOT touch the existing album/photos — it inserts a *new* `post`
-  row with `albumId` set directly to the existing album (no schema constraint stops an album having
-  multiple contributing posts) plus new `photo` rows continuing the existing `position` sequence
-  (queried via `desc(photo.position) limit 1`, not reset to 0, so ordering across batches stays
-  stable). This new post gets `isStatusPost: true` and an auto-generated `title` ("Ein neues Foto
-  zum Album ... wurde hinzugefügt" for exactly one file, else "Neue Fotos zum Album ... wurden
-  hinzugefügt" — singular vs. plural wording only, deliberately no exact count in the plural case)
-  instead of user-provided text, and shows up in the feed like any other post via the existing
-  `post.album` truthiness check — no feed-specific code needed.
-  **Rendering quirk to know about:** the feed and `/posts/[id]` intentionally do NOT always render
-  a post's own `photos` relation — if `post.id === post.album.originPostId` (i.e. this is the post
-  that originally created the album), they render `post.album.photos` instead (the album's full,
-  current photo list) so the origin post's card visibly grows as more photos are added to its
-  album over time; every other post (including `addPhotos`-created ones) still renders its own
-  `photos` only. Both `src/routes/+page.server.ts` and `src/routes/posts/[id]/+page.server.ts` load
-  `album: { with: { photos: ... } }` (not just `album: true`) to make this possible — if you add a
-  new place that renders a post's photo grid, replicate this same origin-post check rather than
-  defaulting to `post.photos`, or the "album grows in place" behavior will silently regress there.
+- `post` — optional title/text, always has an `authorId`. Has no relationship to albums at all —
+  see below, that used to not be true and caused a lot of accidental complexity.
+- `photo` — always belongs to exactly one `post` (`postId` not null). A "loose" photo, showing up
+  in the `/photos` stream.
+- `album` / `album_photo` — **fully independent of `post`/`photo`**, mirroring how `checkin`/
+  `checkin_photo` and `activity`/`activity_photo` already worked. An album is `id`, `title`
+  (required), optional `description`, `slug`, `authorId`, `createdAt` — no carrier post, no
+  `originPostId`. Its photos live in their own `album_photo` table (`albumId` NOT NULL, cascade),
+  with a `position` sequence just like `photo`/`checkin_photo`/`activity_photo`. Created directly
+  via `createAlbum()` (`lib/server/albums.ts`) — web UI (`routes/albums/+page.server.ts`'s
+  `createAlbum` action) or Micropub (`routes/api/micropub/album`) — and grown later via
+  `addPhotosToAlbum()`, which continues the existing `position` sequence (queried via
+  `desc(position) limit 1`, not reset to 0) and stamps every new row with a fresh, shared
+  `createdAt`.
+  **This used to be very different and much more complicated** — album photos lived in the shared
+  `photo` table, every album needed a carrier `post` row (`photo.postId` is `NOT NULL`, so a
+  post-less photo was impossible), adding photos later created an invisible auto-generated
+  `isStatusPost` post, and the feed had a whole "origin post renders `post.album.photos` instead of
+  its own `photos`" rendering quirk to make an album's card visually grow in the feed over time.
+  All of that is gone now. If you ever see any of those terms (`originPostId`, `isStatusPost`,
+  `post.albumId`, `photo.albumId`) in old comments/git history, that's what they refer to — don't
+  reintroduce that coupling.
+  **Feed signal without a carrier post:** since there's no post to represent "album was
+  created"/"photos were added to this album" as separate feed moments, `routes/+page.server.ts`
+  derives these directly from `album_photo`: rows sharing the *exact same* `createdAt` (one JS
+  `Date` instance is passed to every insert in a given request, see `albums.ts`) are one batch: the
+  batch whose `createdAt` equals `album.createdAt` is the "album created" event, any later batch is
+  a "N photos added to album X" event. Both render via `AlbumFeedCard.svelte`.
+  Note there is one legacy exception: `routes/photos/+page.server.ts` used to have a
+  `createAlbumFromSelection` action letting you turn already-existing *loose* post photos into a
+  new album without a carrier post (`photo.albumId` set directly, `originPostId: null`) — since a
+  photo could belong to a post and an album at once there. That's gone too (removed, not migrated
+  forward) since it's fundamentally incompatible with albums being independent — a photo can't be
+  both an `album_photo` row and a `photo` row without being duplicated on disk-reference. Albums
+  now only ever get photos through direct upload (web form or Micropub), never by re-tagging an
+  existing post's photo.
 - `user` / `session` — session tokens are opaque random tokens stored in the `session` table
   (not JWTs), checked against `expiresAt` on every request.
 
 **Auth flow:** `src/hooks.server.ts` runs on every request, loads the session user via
 `getSessionUser` (`src/lib/server/auth.ts`) into `event.locals.user`. Reading is public by
 default — feed, photos, albums, post/photo permalinks and `/uploads/*` all work without a login.
-`PROTECTED_PREFIXES` (`src/lib/server/redirect.ts`) is currently **empty**: post/checkin/album
-*creation* moved to Micropub-only (see below) and there is no other write-only page left that
-needs a prefix-based `/login` redirect. If a new write-only page is ever added again (a route
+`PROTECTED_PREFIXES` (`src/lib/server/redirect.ts`) is currently **empty**: post/checkin creation
+moved to Micropub-only (see below), and `/albums`' own "+ Neues Album" form is a public *page*
+whose `createAlbum` *action* does its own auth check (same pattern as `addPhotos` below) rather
+than needing the whole page gated — so there is no write-only page left that needs a
+prefix-based `/login` redirect. If a new write-only page is ever added again (a route
 whose whole purpose is creating something, the way `/posts/new` used to be), add its prefix here
 — but remember `PROTECTED_PREFIXES` alone doesn't help a route with no `load` function, since
 SvelteKit skips the server round-trip on client-side navigation to such a route and the hook never
@@ -115,19 +121,37 @@ anymore: `user.passwordHash` was dropped from the schema, `hashPassword`/`verify
 from `auth.ts`, and `create-user` no longer takes a password argument — recovery if the IndieAuth
 server itself is ever unreachable means restoring *that* server, not this app's DB.
 
-**Post/checkin/album creation is Micropub-only — there is no web form.** `PostComposer.svelte`,
-`CheckinComposer.svelte`, `/posts/new`, and `/checkins/new` were removed; the only way to create a
-post, checkin, or album is `POST /api/micropub/{post,checkin,album}` (see `docs/api.md`), called by
-an IndieAuth/Micropub client (e.g. the separate Quill editor project, an Apple Shortcut, or
-osm-checkin). Editing and deleting existing posts/checkins/albums still happens through the web UI
-(`EditPostForm.svelte`, `EditCheckinForm.svelte`, the delete actions on `/posts/[slug]` etc.) —
-only the *creation* path moved. Each Micropub endpoint owns exactly one entity type (no in-endpoint
-dispatch flag); `routes/api/micropub/post` also does not create albums, that's
-`routes/api/micropub/album`'s own job. One real feature gap versus the old web composer: the
-Micropub endpoints only support a single fixed text block + single photos block per entity, while
-the web UI's `BlockEditor` (still used by the edit forms) supports an arbitrarily ordered mix of
-multiple text/photo blocks — a Micropub-created post/checkin can't produce that richer block
-structure, only editing one afterward can.
+**Post/checkin creation is Micropub-only — there is no web form. Album creation has both a web
+form AND Micropub.** `PostComposer.svelte`, `CheckinComposer.svelte`, `/posts/new`, and
+`/checkins/new` were removed; the only way to create a post or checkin is `POST
+/api/micropub/{post,checkin}` (see `docs/api.md`), called by an IndieAuth/Micropub client (e.g. the
+separate Quill editor project, an Apple Shortcut, or osm-checkin). Albums are the one exception —
+`routes/albums/+page.server.ts`'s `createAlbum` action (the "+ Neues Album" form on `/albums`) and
+`POST /api/micropub/album` both create albums directly, independently of each other, no dispatch
+flag or shared code path between the two beyond `lib/server/albums.ts`'s `createAlbum()` helper.
+Editing and deleting existing posts/checkins/albums happens through the web UI regardless of how
+they were created (`EditPostForm.svelte`, `EditCheckinForm.svelte`, `DeleteAlbumButton.svelte`,
+the delete actions on `/posts/[slug]` etc.) — only *creation* is split this way. One real feature
+gap versus the old web composer: the Micropub post/checkin endpoints only support a single fixed
+text block + single photos block per entity, while the web UI's `BlockEditor` (still used by the
+edit forms) supports an arbitrarily ordered mix of multiple text/photo blocks — a
+Micropub-created post/checkin can't produce that richer block structure, only editing one
+afterward can. Albums never had blocks at all (single `description` field instead), so this gap
+doesn't apply to them.
+
+**`/api/micropub/checkin` supports photos via a Micropub media endpoint, not direct multipart
+upload** — it takes a JSON body (the h-entry shape osm-checkin sends), so a photo can't be
+attached in the same request the way `post`/`album` do it. Instead: `GET
+/api/micropub/checkin?q=config` (IndieAuth-authenticated, same as `POST`) tells the client where
+the media endpoint is; the client `POST`s the file to `/api/micropub/media` first (also
+IndieAuth-only, `saveUploadedPhoto()` same as everywhere else) and gets back a `{origin}/uploads/
+{filename}` URL; that URL is what goes in the checkin's `properties.photo`. The checkin endpoint
+only ever resolves `photo` URLs matching its own `{origin}/uploads/` prefix
+(`extractOwnUploadFilename` in `routes/api/micropub/checkin/+server.ts`) — it never fetches an
+arbitrary third-party URL — and reads the file's dimensions back off disk via
+`readUploadedPhotoDimensions()` (`storage.ts`) since the media endpoint's response doesn't carry
+them. A URL that doesn't match, or a file that's gone, is silently skipped rather than failing the
+whole checkin.
 
 **Photo storage:** Photos are written to disk (`UPLOAD_DIR`, default `./uploads`) with a random
 UUID filename (original extension preserved if it's an allowed image type) — see
@@ -136,10 +160,10 @@ streams the file and resolves the MIME type from the extension. `uploadFilePath(
 directory components from the requested filename (`path.basename`) to prevent path traversal, so
 that route is intentionally excluded from the auth gate in `hooks.server.ts`.
 
-**Post creation is a single transa-style sequence** (not an actual DB transaction — libsql/http
-here): insert the post, then conditionally insert an album and back-fill the post's `albumId`, then
-insert one `photo` row per uploaded file with an incrementing `position`. When touching this flow,
-keep the order (post → album → photos) since photos and albums both reference the post's id.
+**Post creation** (not an actual DB transaction — libsql/http here): insert the post, then insert
+one `photo` row per uploaded file with an incrementing `position`. Album creation is its own,
+separate sequence now (`createAlbum` in `lib/server/albums.ts`): insert the album, then insert one
+`album_photo` row per file — no post involved at all.
 
 **Foreign keys are NOT enforced at runtime — this bit post deletion once already, watch for it
 again.** SQLite only applies `ON DELETE CASCADE`/`SET NULL` when the connection has run `PRAGMA
@@ -149,20 +173,14 @@ toggled inside the client's `migrate()` method, which this project doesn't use, 
 `drizzle-kit push` instead). So every `.references(..., { onDelete: ... })` in `schema.ts` only
 shapes the DDL `drizzle-kit push` emits — it is otherwise decorative. **Any code that deletes a
 `post` or `album` row must explicitly delete/update everything that would have cascaded**, in the
-right order, before or after the row delete as needed (see `routes/posts/[id]/+page.server.ts`'s
-`delete` action: reads the post's own `photos` and its `album` first, nulls `album.originPostId` if
-this post was the origin, deletes the post's own `photo` rows and their on-disk files via
-`deleteUploadedPhoto()` (`lib/server/storage.ts`), then deletes the `post` row — nothing here
-happens automatically). Forgetting this leaves orphaned rows/files behind (e.g. photo rows with no
-owning post would keep showing up in the `/photos` global stream forever).
-
-**Deleting a post never touches the `album` row itself**, even when the post created the album —
-only `album.originPostId` gets nulled if this post was that album's origin (so the "Zum
-Ursprungs-Post" link disappears instead of pointing at a 404). This is an unavoidable consequence
-of the schema, not a bug: an origin post's own `photo` rows carry both `postId` *and* `albumId` on
-the same rows (they're not duplicated), and `photo.postId` is `NOT NULL`, so deleting the origin
-post necessarily deletes its own original photos (files + rows) along with it — only the album
-entity and any photos contributed later by other posts (via `addPhotos`) survive.
+right order, before or after the row delete as needed (see `deletePostCascade` in
+`lib/server/posts.ts`: deletes the post's own `photo` rows and their on-disk files via
+`deleteUploadedPhoto()` (`lib/server/storage.ts`), its `post_block`/`post_tag` rows, then the
+`post` row itself — nothing here happens automatically). Forgetting this leaves orphaned
+rows/files behind (e.g. photo rows with no owning post would keep showing up in the `/photos`
+global stream forever). Album deletion (`routes/albums/[slug]/+page.server.ts`'s `deleteAlbum`
+action) is now simpler than it used to be for the same reason albums are independent: delete its
+`album_photo` rows + files, then the `album` row — no posts to untangle at all anymore.
 
 **`DeletePostButton.svelte` is shared between the feed and `/posts/[id]`** via an optional
 `afterDelete?: () => void` prop (same callback-prop precedent as `PhotoLightbox`'s
@@ -208,10 +226,13 @@ depending on where you clicked:
 - Post-scoped: `/posts/[id]/photo/[photoId]`, used by `PhotoGrid.svelte` (feed + post detail).
   Prev/next cycles through that one post's photos.
 - Stream-scoped: `/photos/[photoId]`, used by `routes/photos/+page.svelte`. Prev/next cycles
-  through *all* photos site-wide (same `desc(createdAt)` order as the `/photos` grid), crossing
-  post boundaries.
-- Album-scoped: `/albums/[id]/photo/[photoId]`, used by `routes/albums/[id]/+page.svelte`.
-  Prev/next cycles through that album's photos only (`asc(position)` order).
+  through *all* photos site-wide (same `desc(createdAt)` order as the `/photos` grid) — this
+  stream aggregates all four photo-owning entities (`photo`/`activity_photo`/`checkin_photo`/
+  `album_photo`), crossing post/activity/checkin/album boundaries alike. `deletePhoto` on
+  `/photos` tries all four tables in turn to find which one a given photo id belongs to.
+- Album-scoped: `/albums/[slug]/photo/[photoId]`, implemented in `AlbumPhotoGrid.svelte` and used
+  by both `routes/albums/[slug]/+page.svelte` and the main feed's `AlbumFeedCard.svelte`. Prev/next
+  cycles through that album's photos only (`asc(position)` order).
 
 Each context duplicates the same small shallow-routing glue (`pushState` on open, `replaceState`
 on prev/next, `history.back()` on close, `Escape`/arrow-key handling, body-scroll lock) inline in

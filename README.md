@@ -7,12 +7,12 @@ allgemeinen Foto-Stream.
 ## Datenmodell
 
 - **Post** – Titel (optional), Text (optional), Autor, Zeitstempel. Kann 0, 1 oder mehrere Fotos
-  haben und optional zu einem Album gehören.
-- **Photo** – gehört immer zu genau einem Post. Gehört zusätzlich zu einem Album, *wenn* beim
-  Erstellen "als Album speichern" aktiviert wurde. Sonst bleibt es ohne Album-Zuordnung und taucht
-  im Foto-Stream (`/photos`) auf.
-- **Album** – entsteht aus einem Post heraus (mind. 2 Fotos + Checkbox aktiviert), bleibt mit
-  diesem Ursprungs-Post verknüpft.
+  haben. Hat keinerlei Bezug zu Alben.
+- **Photo** – gehört immer zu genau einem Post, taucht im Foto-Stream (`/photos`) auf.
+- **Album** – komplett eigenständig (wie Checkin/Activity), eigene `album_photo`-Tabelle statt
+  gemeinsamer `photo`-Tabelle. Entsteht direkt mit ≥2 eigenen Fotos (Web-Formular auf `/albums`
+  oder Micropub), kein zugrundeliegender Post nötig. Weitere Fotos können später ergänzt werden.
+- **Checkin** / **Activity** – ebenfalls komplett eigenständig, eigene Tabellen.
 
 ## Stack
 
@@ -20,8 +20,8 @@ allgemeinen Foto-Stream.
   Node-Server auf deinem Server, kein externer Hosting-Dienst nötig)
 - [Drizzle ORM](https://orm.drizzle.team/) + SQLite (über `@libsql/client`, keine native
   Kompilierung nötig)
-- Eigene, schlanke Session-Auth (Passwort-Hashing mit `node:crypto` scrypt, Session-Cookie) —
-  bewusst kein Auth-Framework, da nur ein/wenige Nutzer vorgesehen sind
+- Login läuft über einen externen IndieAuth-Server (Passkey-basiert), kein lokales Passwort —
+  Session-Cookie danach genau wie zuvor, bewusst kein Auth-Framework
 - Fotos werden als Dateien auf dem Server-Dateisystem gespeichert (Pfad in der DB), ausgeliefert
   über die Route `/uploads/[filename]`
 
@@ -31,7 +31,7 @@ allgemeinen Foto-Stream.
 npm install
 cp .env.example .env      # ggf. Werte anpassen
 npm run db:push           # legt die SQLite-Tabellen an
-npm run create-user -- "du@example.com" "dein-passwort" "Dein Name"
+npm run create-user -- "du@example.com" "Dein Name"
 npm run dev -- --open
 ```
 
@@ -40,7 +40,7 @@ npm run dev -- --open
 Es gibt keine öffentliche Registrierung. Accounts werden über ein Skript angelegt:
 
 ```bash
-npm run create-user -- "du@example.com" "dein-passwort" "Dein Name"
+npm run create-user -- "du@example.com" "Dein Name"
 ```
 
 ## Deployment auf eigenem Server
@@ -49,7 +49,7 @@ npm run create-user -- "du@example.com" "dein-passwort" "Dein Name"
 npm install
 npm run build
 npm run db:push
-npm run create-user -- "du@example.com" "dein-passwort" "Dein Name"
+npm run create-user -- "du@example.com" "Dein Name"
 
 # .env für Produktion anpassen, insbesondere:
 #   ORIGIN=https://deine-domain.tld
@@ -88,23 +88,25 @@ Wichtig:
 ## Seiten
 
 - `/` – Feed, neueste Posts zuerst
-- `/photos` – Foto-Stream (nur Einzelfotos ohne Album)
+- `/photos` – Foto-Stream, aggregiert Fotos aus Posts, Aktivitäten, Checkins und Alben
 - `/albums` – Alle Alben
 - `/albums/[slug]` – Album-Detail mit allen zugehörigen Fotos
 - `/login` – Anmelden per IndieAuth (kein Passwort — Redirect zum externen IndieAuth-Server)
 
-Post/Checkin/Album-*Erstellung* gibt es nicht mehr als eigene Seite — siehe API unten.
+Post-/Checkin-*Erstellung* gibt es nicht mehr als eigene Seite (siehe API unten). Album-Erstellung
+läuft **beides**: ein "+ Neues Album"-Formular direkt auf `/albums`, und der Micropub-Endpoint.
 
 ## API
 
-Erstellen von Posts, Checkins und Alben läuft ausschließlich über private, token-authentifizierte
+Erstellen von Posts und Checkins läuft ausschließlich über private, token-authentifizierte
 Micropub-Endpunkte (eigene Apple Shortcuts per statischem Token, oder ein IndieAuth-Client wie der
-separate Quill-Editor) — siehe [docs/api.md](docs/api.md). Bearbeiten/Löschen bereits bestehender
-Einträge bleibt normale Web-UI.
+separate Quill-Editor) — siehe [docs/api.md](docs/api.md). Alben können zusätzlich auch direkt über
+die Web-UI angelegt werden. Bearbeiten/Löschen bereits bestehender Einträge bleibt immer normale
+Web-UI.
 
 ## Bekannte Grenzen / mögliche nächste Schritte
 
-- Kein Passwort-Reset-Flow (Passwort ggf. per `create-user`-Skript neu anlegen)
+- Login hängt am externen IndieAuth-Server — ist der nicht erreichbar, kommt niemand mehr rein
 - Aktuell auf einen "Autor" ausgelegt; das Datenmodell trägt eine `authorId`, mehrere Accounts
   sind also grundsätzlich möglich, es gibt aber (noch) keine Rechteverwaltung zwischen Nutzern
 - Keine Bildkompression/Thumbnails — Originale werden 1:1 gespeichert und ausgeliefert

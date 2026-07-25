@@ -1,7 +1,8 @@
 import { db } from '$lib/server/db';
-import { eq, inArray } from 'drizzle-orm';
-import { album, photo, post } from '$lib/server/db/schema';
+import { eq, desc } from 'drizzle-orm';
+import { album, albumPhoto } from '$lib/server/db/schema';
 import { slugify } from '$lib/server/slug';
+import { saveUploadedPhoto } from '$lib/server/storage';
 import { randomUUID } from 'node:crypto';
 
 /** Generates a unique URL slug for a new album — same scheme as generatePostSlug in posts.ts.
@@ -18,13 +19,14 @@ export async function generateAlbumSlug(title: string, id: string): Promise<stri
 	return candidate;
 }
 
-/** Creates an album from an already-existing post's photos, linking both the post and the given
- *  photos to it. Used by `routes/api/micropub/album/+server.ts`, the only album-creation path now
- *  that album creation moved from the (removed) web composer to Micropub-only. */
-export async function createAlbumFromPost(
-	postId: string,
+/** Creates a brand-new, fully independent album with its own photos — no carrier `post` involved
+ *  (unlike the old `createAlbumFromPost`). Used by both the web `createAlbum` action and the
+ *  Micropub album endpoint. `createdAt` is shared by every inserted `album_photo` row and the
+ *  album itself, so the feed's batch-grouping (see routes/+page.server.ts) recognizes this as the
+ *  album's "created" event rather than a later "photos added" one. */
+export async function createAlbum(
 	info: { title: string; description: string | null },
-	photoIds: string[],
+	files: File[],
 	authorId: string,
 	createdAt: Date
 ): Promise<{ albumId: string; albumSlug: string }> {
@@ -36,15 +38,52 @@ export async function createAlbumFromPost(
 		slug: albumSlug,
 		title: info.title,
 		description: info.description,
-		originPostId: postId,
 		authorId,
 		createdAt
 	});
 
-	await db.update(post).set({ albumId }).where(eq(post.id, postId));
-	await db.update(photo).set({ albumId }).where(inArray(photo.id, photoIds));
+	let position = 0;
+	for (const file of files) {
+		const { filename, width, height } = await saveUploadedPhoto(file);
+		await db.insert(albumPhoto).values({
+			filename,
+			width,
+			height,
+			originalName: file.name,
+			albumId,
+			position: position++,
+			createdAt
+		});
+	}
 
 	return { albumId, albumSlug };
+}
+
+/** Appends photos to an already-existing album, continuing the position sequence and stamping
+ *  every new row with the same fresh `createdAt` — that shared timestamp is what makes this batch
+ *  show up as its own "N photos added to album X" feed event, distinct from the album's original
+ *  creation event and any earlier addition batch. */
+export async function addPhotosToAlbum(albumId: string, files: File[], createdAt: Date): Promise<void> {
+	const [lastPhoto] = await db
+		.select({ position: albumPhoto.position })
+		.from(albumPhoto)
+		.where(eq(albumPhoto.albumId, albumId))
+		.orderBy(desc(albumPhoto.position))
+		.limit(1);
+	let position = (lastPhoto?.position ?? -1) + 1;
+
+	for (const file of files) {
+		const { filename, width, height } = await saveUploadedPhoto(file);
+		await db.insert(albumPhoto).values({
+			filename,
+			width,
+			height,
+			originalName: file.name,
+			albumId,
+			position: position++,
+			createdAt
+		});
+	}
 }
 
 /** Resolves a `/albums/[slug]` route param to an album, trying the slug first and falling back to

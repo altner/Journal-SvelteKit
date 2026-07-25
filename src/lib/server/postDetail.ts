@@ -21,11 +21,6 @@ export const postDetailLoad = async ({ params, url }: { params: { slug: string }
 				orderBy: (block, { asc }) => asc(block.position),
 				with: { photos: { orderBy: (photo, { asc }) => asc(photo.position) } }
 			},
-			album: {
-				with: {
-					photos: { orderBy: (photo, { asc }) => asc(photo.position) }
-				}
-			},
 			tags: { with: { tag: true } }
 		}
 	});
@@ -95,7 +90,7 @@ export const postDetailActions: Actions = {
 
 		const found = await db.query.post.findFirst({
 			where: eq(post.id, resolved.post.id),
-			with: { photos: true, album: true }
+			with: { photos: true }
 		});
 		if (!found) throw error(404, 'Beitrag nicht gefunden');
 
@@ -115,10 +110,6 @@ export const postDetailActions: Actions = {
 			with: { blocks: { with: { photos: true } } }
 		});
 		if (!found) throw error(404, 'Beitrag nicht gefunden');
-
-		if (found.isStatusPost) {
-			return fail(403, { error: 'Automatische Album-Beiträge können nicht bearbeitet werden.' });
-		}
 
 		const data = await request.formData();
 		const title = String(data.get('title') ?? '').trim();

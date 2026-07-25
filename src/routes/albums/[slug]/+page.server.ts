@@ -1,13 +1,10 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 import { db } from '$lib/server/db';
-import { eq, desc, inArray } from 'drizzle-orm';
-import { album, photo, post, postBlock } from '$lib/server/db/schema';
+import { eq } from 'drizzle-orm';
+import { album, albumPhoto } from '$lib/server/db/schema';
 import { deleteUploadedPhoto } from '$lib/server/storage';
-import { deletePostCascade, isPostNowEmpty, generatePostSlug } from '$lib/server/posts';
-import { findAlbumBySlugOrId } from '$lib/server/albums';
-import { saveNewPostBlocks, pruneEmptyPhotoBlocks, type BlockMeta } from '$lib/server/blocks';
-import { randomUUID } from 'node:crypto';
+import { findAlbumBySlugOrId, addPhotosToAlbum } from '$lib/server/albums';
 
 export const load: PageServerLoad = async ({ params, url }) => {
 	const resolved = await findAlbumBySlugOrId(params.slug);
@@ -25,16 +22,8 @@ export const load: PageServerLoad = async ({ params, url }) => {
 
 	if (!found) throw error(404, 'Album nicht gefunden');
 
-	const originPost = found.originPostId
-		? await db.query.post.findFirst({
-				where: eq(post.id, found.originPostId),
-				columns: { slug: true }
-			})
-		: null;
-
 	return {
 		album: found,
-		originPostSlug: originPost?.slug ?? found.originPostId,
 		canonicalUrl: `${url.origin}/albums/${found.slug}`,
 		ogImage: found.photos[0] ? `${url.origin}/uploads/${found.photos[0].filename}` : null
 	};
@@ -48,11 +37,7 @@ export const actions: Actions = {
 		const resolved = await findAlbumBySlugOrId(params.slug);
 		if (!resolved) throw error(404, 'Album nicht gefunden');
 
-		const found = await db.query.album.findFirst({ where: eq(album.id, resolved.album.id) });
-		if (!found) throw error(404, 'Album nicht gefunden');
-
 		const data = await request.formData();
-		const text = String(data.get('text') ?? '').trim();
 		const files = data
 			.getAll('photos')
 			.filter((f): f is File => f instanceof File && f.size > 0);
@@ -61,44 +46,7 @@ export const actions: Actions = {
 			return fail(400, { error: 'Bitte füge mindestens ein Foto hinzu.' });
 		}
 
-		// Weiterzählen statt bei 0 neu anzufangen, damit die Reihenfolge stabil bleibt.
-		const [lastPhoto] = await db
-			.select({ position: photo.position })
-			.from(photo)
-			.where(eq(photo.albumId, found.id))
-			.orderBy(desc(photo.position))
-			.limit(1);
-		const startPhotoPosition = (lastPhoto?.position ?? -1) + 1;
-
-		const title =
-			files.length === 1
-				? `Ein neues Foto zum Album "${found.title}" wurde hinzugefügt`
-				: `Neue Fotos zum Album "${found.title}" wurden hinzugefügt`;
-
-		const id = randomUUID();
-		const slug = await generatePostSlug(title, id);
-
-		const [createdPost] = await db
-			.insert(post)
-			.values({
-				id,
-				slug,
-				title,
-				authorId: user.id,
-				albumId: found.id,
-				isStatusPost: true
-			})
-			.returning();
-
-		const blocksMeta: BlockMeta[] = [];
-		if (text) blocksMeta.push({ id: randomUUID(), type: 'text', text });
-		blocksMeta.push({ id: randomUUID(), type: 'photos', fileField: 'photos', excludeFromStream: false });
-
-		const { nonExcludedPhotoIds } = await saveNewPostBlocks(createdPost.id, blocksMeta, data, {
-			startPhotoPosition
-		});
-
-		await db.update(photo).set({ albumId: found.id }).where(inArray(photo.id, nonExcludedPhotoIds));
+		await addPhotosToAlbum(resolved.album.id, files, new Date());
 	},
 
 	deletePhoto: async ({ request, params, locals }) => {
@@ -111,23 +59,13 @@ export const actions: Actions = {
 		const data = await request.formData();
 		const photoId = String(data.get('photoId') ?? '');
 
-		const found = await db.query.photo.findFirst({ where: eq(photo.id, photoId) });
+		const found = await db.query.albumPhoto.findFirst({ where: eq(albumPhoto.id, photoId) });
 		if (!found || found.albumId !== resolved.album.id) {
 			throw error(404, 'Foto nicht gefunden');
 		}
 
 		await deleteUploadedPhoto(found.filename);
-		await db.delete(photo).where(eq(photo.id, found.id));
-		await pruneEmptyPhotoBlocks(found.postId);
-
-		const owner = await db.query.post.findFirst({
-			where: eq(post.id, found.postId),
-			with: { blocks: { with: { photos: true } }, album: true }
-		});
-
-		if (owner && isPostNowEmpty(owner, owner.blocks)) {
-			await deletePostCascade({ id: owner.id, photos: [], album: owner.album });
-		}
+		await db.delete(albumPhoto).where(eq(albumPhoto.id, found.id));
 	},
 
 	deleteAlbum: async ({ params, locals }) => {
@@ -143,33 +81,12 @@ export const actions: Actions = {
 		});
 		if (!found) throw error(404, 'Album nicht gefunden');
 
-		const contributingPosts = await db.select().from(post).where(eq(post.albumId, found.id));
-
 		for (const p of found.photos) {
 			await deleteUploadedPhoto(p.filename);
 		}
-		await db.delete(photo).where(eq(photo.albumId, found.id));
-
-		const originRef = { id: found.id, originPostId: found.originPostId };
-
-		for (const p of contributingPosts) {
-			await pruneEmptyPhotoBlocks(p.id);
-
-			if (p.isStatusPost) {
-				await deletePostCascade({ id: p.id, photos: [], album: originRef });
-			} else {
-				await db.update(post).set({ albumId: null }).where(eq(post.id, p.id));
-				const remainingBlocks = await db.query.postBlock.findMany({
-					where: eq(postBlock.postId, p.id),
-					with: { photos: true }
-				});
-				if (isPostNowEmpty(p, remainingBlocks)) {
-					await deletePostCascade({ id: p.id, photos: [], album: originRef });
-				}
-			}
-		}
-
+		await db.delete(albumPhoto).where(eq(albumPhoto.albumId, found.id));
 		await db.delete(album).where(eq(album.id, found.id));
+
 		redirect(303, '/albums');
 	}
 };
