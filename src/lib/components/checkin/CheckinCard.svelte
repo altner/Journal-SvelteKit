@@ -34,6 +34,7 @@
 			locationPlace: string | null;
 			locationCountry: string | null;
 			locationName: string | null;
+			locationUrl: string | null;
 			road: string | null;
 			houseNumber: string | null;
 			postcode: string | null;
@@ -133,6 +134,9 @@
 			{#if post.road}<p>{post.road}{post.houseNumber ? ` ${post.houseNumber}` : ''}</p>{/if}
 			{#if post.postcode || post.locationPlace}
 				<p>{[post.postcode, post.locationPlace].filter(Boolean).join(' ')}</p>
+			{/if}
+			{#if post.locationUrl}
+				<p><a href={post.locationUrl} target="_blank" rel="noopener">Auf OSM ansehen</a></p>
 			{/if}
 		</div>
 		<TrackMap

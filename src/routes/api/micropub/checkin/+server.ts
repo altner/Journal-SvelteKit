@@ -14,7 +14,9 @@ import { authorizeIndieAuthCheckinRequest } from '$lib/server/indieAuthCheckinAu
 interface MicropubJsonEntry {
 	type?: string[];
 	properties?: {
-		checkin?: [{ properties?: { name?: string[]; latitude?: string[]; longitude?: string[] } }];
+		checkin?: [
+			{ properties?: { name?: string[]; latitude?: string[]; longitude?: string[]; url?: string[] } }
+		];
 		content?: string[];
 	};
 }
@@ -35,6 +37,7 @@ export const POST: RequestHandler = async ({ request, url, fetch }) => {
 
 	const checkinCard = body.properties?.checkin?.[0];
 	const locationName = String(checkinCard?.properties?.name?.[0] ?? '').trim();
+	const locationUrl = String(checkinCard?.properties?.url?.[0] ?? '').trim();
 	const latitudeRaw = checkinCard?.properties?.latitude?.[0];
 	const longitudeRaw = checkinCard?.properties?.longitude?.[0];
 	const latitude = typeof latitudeRaw === 'string' ? Number(latitudeRaw) : NaN;
@@ -82,6 +85,7 @@ export const POST: RequestHandler = async ({ request, url, fetch }) => {
 		latitude,
 		longitude,
 		locationName: locationName || null,
+		locationUrl: locationUrl || null,
 		locationPlace,
 		locationCountry,
 		road,

@@ -1,5 +1,21 @@
 # Todo
 
+## Checkin: OSM-Quelllink (locationUrl) durchreichen — erledigt, noch nicht deployed
+
+osm-checkin schickt in der Checkin-h-card bereits eine `url`-Property (Link zum OSM-Node/Way, aus
+dem `osm-checkin`-Projekt), die bisher beim Import ignoriert wurde. Wunsch: sichtbar machen, damit
+man vom Checkin aus direkt zum POI auf OSM springen kann (z.B. um ihn dort zu korrigieren).
+
+- [x] `schema.ts`: `checkin.locationUrl` (nullable text) ergänzt
+- [x] `routes/api/micropub/checkin/+server.ts`: `checkinCard.properties.url[0]` auslesen und
+      speichern
+- [x] `CheckinCard.svelte`: Link "Auf OSM ansehen" unter der Adresse, nur wenn `locationUrl` gesetzt
+- [x] `npm run check` — 0 Fehler
+- [ ] Bewusst nicht in `EditCheckinForm.svelte`/`checkinDetail.ts`'s Update-Pfad aufgenommen — wird
+      nur bei Erstellung gesetzt, bleibt aber bei einer Bearbeitung erhalten (partial update)
+- [ ] Deploy durch Nutzer selbst (`scripts/deploy.sh`) — enthält additive Spalte, `drizzle-kit push`
+      sollte ohne Datenverlust-Warnung durchlaufen
+
 ## Micropub-Endpoint in drei getrennte Endpunkte aufgespalten — erledigt
 
 Nutzerkritik am vorherigen Single-Endpoint-Dispatch (ein `/api/micropub`, das per Feld-Präsenz

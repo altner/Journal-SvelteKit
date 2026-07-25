@@ -159,6 +159,9 @@ export const checkin = sqliteTable('checkin', {
 	locationPlace: text('location_place'), // city name via Nominatim, see routes/api/micropub
 	locationCountry: text('location_country'),
 	locationName: text('location_name'), // optional POI label, user-editable
+	// Source POI link (e.g. the OSM node/way page), as sent by osm-checkin's h-card `url` property
+	// — set once at creation, not exposed in EditCheckinForm/checkinDetail.ts's update path.
+	locationUrl: text('location_url'),
 	// Full street address, all via Nominatim's reverse-geocode `address` object — nullable, no
 	// default (same db:push-losslessness reason as the GPS columns above). Kept separate from
 	// locationPlace (city) rather than folded together, since LocationPicker.svelte is shared with
