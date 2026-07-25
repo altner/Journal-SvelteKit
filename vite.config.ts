@@ -15,6 +15,14 @@ export default defineConfig({
 					config.include.push('../drizzle.config.ts');
 				}
 			},
+			// SvelteKit's built-in CSRF check blocks cross-site form-content-type POSTs (multipart/
+			// form-data, x-www-form-urlencoded) before `handle` even runs, regardless of the CORS
+			// headers set there — it protects cookie-based session routes, but /api/micropub/post
+			// authenticates via Bearer token only, so it needs an explicit trusted-origin exemption.
+			// /api/micropub/checkin isn't affected since it sends a JSON body, not form-content-type.
+			csrf: {
+				trustedOrigins: ['https://quill.altner.cloud']
+			},
 			// SvelteKit generates a per-request nonce for its own inline bootstrap <script> (and any
 			// inline <style> from Svelte transitions) and adds it to these directives automatically -
 			// that's why script-src can stay strict here without 'unsafe-inline', unlike a hand-rolled
