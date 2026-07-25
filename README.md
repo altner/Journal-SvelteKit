@@ -69,8 +69,10 @@ Wichtig:
 - **`BODY_SIZE_LIMIT`** in der `.env` steuert die maximale Upload-Größe pro Request (Standard im
   Adapter: 512 KB — in `.env.example` bereits auf `100M` gesetzt, da ein Aktivitäts-Upload GPX-Track
   und mehrere unverkleinerte Fotos in einem Request bündelt und real schon ~48 MB erreicht hat).
-- **`ORIGIN`** muss auf deine echte URL gesetzt sein, sonst blockiert SvelteKits CSRF-Schutz alle
-  Formular-Submits (Login, Post erstellen, …).
+- **`ORIGIN`** muss auf deine echte URL gesetzt sein — SvelteKits CSRF-Schutz blockiert sonst
+  Formular-Submits (Bearbeiten, Löschen, …), und der IndieAuth-Login baut `client_id`/`redirect_uri`
+  direkt aus `ORIGIN` ab (muss exakt mit dem übereinstimmen, was beim IndieAuth-Server hinterlegt
+  bzw. per Discovery erreichbar ist).
 
 ## Nützliche Skripte
 
@@ -81,7 +83,7 @@ Wichtig:
 | `npm run check`        | Typecheck (svelte-check)                    |
 | `npm run db:push`      | Schema-Änderungen in die DB übernehmen      |
 | `npm run db:studio`    | Drizzle Studio (DB im Browser ansehen)      |
-| `npm run create-user`  | Login-Account anlegen                       |
+| `npm run create-user`  | Login-Account anlegen (kein Passwort mehr, siehe unten) |
 
 ## Seiten
 
@@ -89,7 +91,7 @@ Wichtig:
 - `/photos` – Foto-Stream (nur Einzelfotos ohne Album)
 - `/albums` – Alle Alben
 - `/albums/[slug]` – Album-Detail mit allen zugehörigen Fotos
-- `/login` – Anmelden
+- `/login` – Anmelden per IndieAuth (kein Passwort — Redirect zum externen IndieAuth-Server)
 
 Post/Checkin/Album-*Erstellung* gibt es nicht mehr als eigene Seite — siehe API unten.
 

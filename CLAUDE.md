@@ -18,7 +18,7 @@ npm run db:push            # push schema.ts changes to the SQLite DB (no migrati
 npm run db:generate        # generate migration files (not currently used by db:push workflow)
 npm run db:migrate         # apply generated migrations
 npm run db:studio          # Drizzle Studio, browse the DB
-npm run create-user -- "you@example.com" "password" "Display Name"   # only way to create a login account
+npm run create-user -- "you@example.com" "Display Name"   # only way to create a login account
 ```
 
 There is no test suite/runner configured in this project.
@@ -97,9 +97,23 @@ on `/posts/[slug]`) must NOT go through `PROTECTED_PREFIXES` — the prefix matc
 `startsWith` on the pathname, so protecting `/albums` or `/posts/[slug]` would also block public
 GET access to those pages. Those actions instead do their own `if (!locals.user) return
 fail(401, ...)` check inside the action handler — the default for new routes/actions is public,
-opt into protection deliberately and at the right granularity. Passwords are hashed with
-`node:crypto` scrypt (`salt:hash` hex format), not bcrypt/argon2, to avoid native dependencies.
-There's no password-reset flow; recovery means re-running `create-user`.
+opt into protection deliberately and at the right granularity.
+
+**Login is IndieAuth, not a local password** — `src/lib/server/indieAuthLogin.ts` +
+`routes/login/{start,callback}/+server.ts`. `/login` only shows a "Mit IndieAuth anmelden" link;
+`/login/start` (GET) generates a PKCE verifier + single-use `state` (stashed in an in-memory `Map`,
+same one-Node-process reasoning as the old rate-limiter) and redirects to
+`INDIEAUTH_AUTHORIZATION_ENDPOINT` (the same external server as `INDIEAUTH_INTROSPECT_URL`, see
+`indieAuthCheckinAuth.ts`) with `me=INDIEAUTH_ME` (skips the identity picker) and **no scope** —
+this is a pure identity confirmation, not an API credential, so the auth server's token endpoint
+takes a shortcut for scope-less requests and returns `{ me }` directly instead of issuing an access
+token. `/login/callback` (GET) exchanges the code for that `{ me }`, checks it equals
+`INDIEAUTH_ME` (plus `iss` against the token endpoint's origin, if present), resolves the local
+owner account via `MICROPUB_USER_EMAIL` (same pattern as the Micropub IndieAuth path), and creates
+a normal session — the `session` table/cookie mechanism itself is unchanged. There is no password
+anymore: `user.passwordHash` was dropped from the schema, `hashPassword`/`verifyPassword` removed
+from `auth.ts`, and `create-user` no longer takes a password argument — recovery if the IndieAuth
+server itself is ever unreachable means restoring *that* server, not this app's DB.
 
 **Post/checkin/album creation is Micropub-only — there is no web form.** `PostComposer.svelte`,
 `CheckinComposer.svelte`, `/posts/new`, and `/checkins/new` were removed; the only way to create a

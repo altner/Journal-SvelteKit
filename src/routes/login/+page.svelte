@@ -1,17 +1,8 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
-	import { onMount, tick } from 'svelte';
-	import type { ActionData, PageData } from './$types';
+	import type { PageData } from './$types';
 
-	let { data, form }: { data: PageData; form: ActionData } = $props();
-	let submitting = $state(false);
-	let unexpectedError = $state<string | undefined>();
-	let emailInput: HTMLInputElement | undefined = $state();
-	let passwordInput: HTMLInputElement | undefined = $state();
-	let errorMessage: HTMLParagraphElement | undefined = $state();
-	const loginError = $derived(unexpectedError ?? form?.error);
-
-	onMount(() => emailInput?.focus());
+	let { data }: { data: PageData } = $props();
+	const startUrl = $derived(`/login/start?redirectTo=${encodeURIComponent(data.redirectTo)}`);
 </script>
 
 <svelte:head>
@@ -19,72 +10,16 @@
 </svelte:head>
 
 <div class="auth-wrap">
-	<form
-		method="POST"
-		class="auth-card"
-		aria-busy={submitting}
-		use:enhance={() => {
-			submitting = true;
-			unexpectedError = undefined;
-			return async ({ result, update }) => {
-				if (result.type === 'error') {
-					unexpectedError = 'Die Anmeldung ist gerade nicht möglich. Bitte versuche es erneut.';
-					submitting = false;
-					await tick();
-					errorMessage?.focus();
-					return;
-				}
-				await update();
-				submitting = false;
-				if (result.type === 'failure') {
-					await tick();
-					const returnedEmail = String(result.data?.email ?? '');
-					if (passwordInput) passwordInput.value = '';
-					(returnedEmail ? passwordInput : emailInput)?.focus();
-				}
-			};
-		}}
-	>
+	<div class="auth-card">
 		<a class="back" href={data.redirectTo}>← Zurück</a>
 		<h1>Anmelden</h1>
 
-		{#if loginError}
-			<p bind:this={errorMessage} class="error" id="login-error" role="alert" tabindex="-1">{loginError}</p>
+		{#if data.error}
+			<p class="error" role="alert">{data.error}</p>
 		{/if}
 
-		<label>
-			E-Mail
-			<input
-				bind:this={emailInput}
-				type="email"
-				name="email"
-				value={form?.email ?? ''}
-				required
-				disabled={submitting}
-				autocomplete="username"
-				aria-invalid={loginError ? 'true' : undefined}
-				aria-describedby={loginError ? 'login-error' : undefined}
-			/>
-		</label>
-
-		<label>
-			Passwort
-			<input
-				bind:this={passwordInput}
-				type="password"
-				name="password"
-				required
-				disabled={submitting}
-				autocomplete="current-password"
-				aria-invalid={loginError ? 'true' : undefined}
-				aria-describedby={loginError ? 'login-error' : undefined}
-			/>
-		</label>
-
-		<button type="submit" disabled={submitting}>
-			{submitting ? 'Anmeldung läuft…' : 'Einloggen'}
-		</button>
-	</form>
+		<a class="indieauth-btn" href={startUrl}>Mit IndieAuth anmelden</a>
+	</div>
 </div>
 
 <style>
@@ -115,20 +50,7 @@
 		font-size: 14px;
 		font-weight: 600;
 	}
-	label {
-		display: flex;
-		flex-direction: column;
-		gap: 4px;
-		font-size: 13px;
-		color: var(--fb-gray);
-	}
-	input {
-		padding: 10px 12px;
-		border: 1px solid var(--fb-border);
-		border-radius: 6px;
-		font-size: 15px;
-	}
-	button {
+	.indieauth-btn {
 		margin-top: 8px;
 		background: var(--fb-blue);
 		color: #fff;
@@ -138,14 +60,11 @@
 		padding: 10px 0;
 		font-size: 16px;
 		font-weight: 600;
-		cursor: pointer;
+		text-align: center;
+		text-decoration: none;
 	}
-	button:hover {
+	.indieauth-btn:hover {
 		background: #166fe0;
-	}
-	button:disabled {
-		cursor: wait;
-		opacity: 0.7;
 	}
 	.error {
 		background: #fde2e1;

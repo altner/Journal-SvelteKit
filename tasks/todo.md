@@ -1,5 +1,56 @@
 # Todo
 
+## Login auf IndieAuth (indie-auth.altner.cloud) umgestellt, Passwort-Login entfernt — erledigt
+
+Nutzerwunsch: der Website-Login (nicht die Micropub-Endpunkte, die haben schon IndieAuth) soll
+ebenfalls über IndieAuth laufen statt E-Mail+Passwort. Der Auth-Server
+(`/Users/adrian/Projects/indie-auth`) implementiert den vollen Authorization-Code-Flow mit PKCE
+(`/auth`, `/token`, `/introspect`, `/userinfo`) — für reines Login reicht ein Request **ohne
+scope**, der Token-Endpoint gibt dann direkt `{ me }` zurück statt einen Access-Token auszustellen
+(kein Token, der clientseitig gespeichert werden müsste).
+
+Ablauf: `/login` zeigt nur noch einen Link "Mit IndieAuth anmelden" (kein Formular mehr) →
+`/login/start` (GET) erzeugt PKCE-`code_verifier`/`state`, merkt sie sich serverseitig
+(In-Memory-Map, gleiche Begründung wie `rate-limit.ts`: ein einziger Node-Prozess, kein Cluster)
+und leitet zu `INDIEAUTH_AUTHORIZATION_ENDPOINT` weiter (`client_id`/`redirect_uri` aus `ORIGIN`
+abgeleitet, `me=INDIEAUTH_ME` überspringt den Identity-Picker, `scope` leer) → Nutzer meldet sich
+per Passkey auf dem Auth-Server an → Redirect zurück zu `/login/callback` (GET) mit `code`+`state`
+(+`iss`) → Callback tauscht den Code gegen `{ me }` am Token-Endpoint (PKCE-Verifier mitgeschickt),
+prüft `me === INDIEAUTH_ME` und optional `iss` gegen die erwartete Auth-Server-Origin, löst den
+lokalen Owner-Account über `MICROPUB_USER_EMAIL` auf (gleiches Muster wie
+`indieAuthCheckinAuth.ts`) und erzeugt eine normale Session (unverändertes `session`-Table/Cookie).
+
+- [x] `src/lib/server/indieAuthLogin.ts` (neu): `startLogin(redirectTo)` (PKCE+state erzeugen,
+      Authorize-URL bauen) und `completeLogin(params, fetchFn)` (Code gegen `{ me }` tauschen,
+      validieren) — reine Auth-Logik, kein SvelteKit-Kram
+- [x] `src/routes/login/start/+server.ts` (neu, GET): ruft `startLogin`, redirect zum Auth-Server
+- [x] `src/routes/login/callback/+server.ts` (neu, GET): ruft `completeLogin`, löst Owner via
+      `MICROPUB_USER_EMAIL` auf, `createSession`, redirect zu `redirectTo` bzw. `/login?error=...`
+- [x] `src/routes/login/+page.server.ts`: `actions` entfernt, `load` gibt zusätzlich `error` aus
+      der Query zurück
+- [x] `src/routes/login/+page.svelte`: Passwort-Formular raus, nur noch Fehleranzeige + Link zu
+      `/login/start?redirectTo=...`
+- [x] `src/lib/server/auth.ts`: `hashPassword`/`verifyPassword` entfernt (tot ohne Passwort-Login),
+      Session-Funktionen unverändert
+- [x] `src/lib/server/rate-limit.ts` gelöscht — war nur vom Passwort-Login genutzt, mit dem
+      IndieAuth-Redirect-Flow gibt's lokal kein zu erratendes Geheimnis mehr
+- [x] `src/lib/server/db/schema.ts`: `user.passwordHash`-Spalte entfernt
+- [x] `scripts/create-user.mjs`: Passwort-Parameter/-Hashing raus, neue Usage `... "email"
+      "Display Name"` (kein Passwort mehr nötig — Login läuft ja über IndieAuth)
+- [x] `.env.example`: `INDIEAUTH_AUTHORIZATION_ENDPOINT`, `INDIEAUTH_TOKEN_ENDPOINT` ergänzt;
+      `MICROPUB_USER_EMAIL`-Kommentar aktualisiert (jetzt auch Owner-Resolution fürs Login)
+- [x] `CLAUDE.md` / `README.md`: Auth-Flow-Beschreibung + `create-user`-Usage aktualisiert
+- [x] `npm run check` / `npm run build` — 0 Fehler; `/login` per Dev-Preview gerendert und Link-Ziel
+      geprüft (`/login/start?redirectTo=%2F`); voller Redirect-Flow ungetestet, da lokales `.env`
+      die zwei neuen `INDIEAUTH_*`-Vars noch nicht hat (erwartetes 500 mit klarer Fehlermeldung,
+      kein Absturz)
+
+**Nacharbeit auf dem Host, nicht von Claude ausgeführt:** `user.password_hash` ist nach dem Schema-
+Update ungenutzt, aber in der Produktions-DB noch `NOT NULL` vorhanden — das ist harmlos (Spalte
+bleibt einfach ungenutzt liegen), bis der Nutzer selbst
+`ALTER TABLE user DROP COLUMN password_hash;` (oder `npm run db:push` interaktiv) ausführt. Kein
+Blocker fürs Deployen dieser Änderung.
+
 ## Post/Checkin/Album-Erstellung konsequent auf Micropub umgestellt, Web-Formulare entfernt — erledigt
 
 Nutzerwunsch: Erstellung soll ausschließlich über Micropub laufen, nicht mehr über Web-Formulare.
